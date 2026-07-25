@@ -9,3 +9,5 @@ config.json
 *.db
 .DS_Store
 Thumbs.db
+
+.vercel

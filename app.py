@@ -23,18 +23,24 @@ app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 from auth import auth_bp
 app.register_blueprint(auth_bp)
 
-# Load config
+# Load config — prefer env vars (Vercel), fall back to config.json (local)
 CONFIG_PATH = Path(__file__).parent / "config.json"
-with open(CONFIG_PATH) as f:
-    CONFIG = json.load(f)
+CONFIG = {}
+if CONFIG_PATH.exists():
+    with open(CONFIG_PATH) as f:
+        CONFIG = json.load(f)
 
-PEXELS_KEY = CONFIG.get("pexels_api_key", "")
-PIXABAY_KEY = CONFIG.get("pixabay_api_key", "")
-COVERR_KEY = CONFIG.get("coverr_api_key", "")
-VIMEO_TOKEN = CONFIG.get("vimeo_access_token", "")
-FREESOUND_TOKEN = CONFIG.get("freesound_token", "")
-DOWNLOAD_DIR = Path(CONFIG.get("download_path", str(Path(__file__).parent / "downloads")))
-DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+PEXELS_KEY = os.environ.get("PEXELS_API_KEY") or CONFIG.get("pexels_api_key", "")
+PIXABAY_KEY = os.environ.get("PIXABAY_API_KEY") or CONFIG.get("pixabay_api_key", "")
+COVERR_KEY = os.environ.get("COVERR_API_KEY") or CONFIG.get("coverr_api_key", "")
+VIMEO_TOKEN = os.environ.get("VIMEO_ACCESS_TOKEN") or CONFIG.get("vimeo_access_token", "")
+FREESOUND_TOKEN = os.environ.get("FREESOUND_TOKEN") or CONFIG.get("freesound_token", "")
+DOWNLOAD_DIR = Path(os.environ.get("DOWNLOAD_PATH") or CONFIG.get("download_path", str(Path(__file__).parent / "downloads")))
+try:
+    DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    DOWNLOAD_DIR = Path("/tmp") / "downloads"
+    DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Search history for learning ──
 SEARCH_LOG_PATH = Path(__file__).parent / "data" / "search_history.json"

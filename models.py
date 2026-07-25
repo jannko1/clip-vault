@@ -9,6 +9,10 @@ from datetime import datetime, timezone
 
 DB_PATH = Path(__file__).parent / "data" / "clipvault.db"
 
+# On Vercel serverless, /var/task is read-only. Use /tmp instead.
+if os.environ.get("VERCEL") or not os.access(str(DB_PATH.parent), os.W_OK):
+    DB_PATH = Path("/tmp") / "clipvault.db"
+
 
 def get_db():
     """Get a database connection with row factory."""
@@ -199,4 +203,7 @@ def increment_searches(user_id: int):
 
 
 # ── Initialize on import ───────────────────────────────
-init_db()
+try:
+    init_db()
+except Exception as e:
+    print(f"[WARNING] Database init skipped: {e}")
