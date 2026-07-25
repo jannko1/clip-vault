@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing — ClipVault</title>
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --surface: #141416;
+    --surface2: #1e1e22;
+    --border: #2a2a30;
+    --text: #e4e4e7;
+    --text2: #8b8b94;
+    --accent: #6c5ce7;
+    --green: #00d68f;
+    --radius: 12px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .header {
+    text-align: center;
+    padding: 60px 24px 20px;
+  }
+  .header h1 {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #a78bfa, #6c5ce7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header p { color: var(--text2); margin-top: 8px; font-size: 15px; }
+  .back-link {
+    display: inline-block;
+    margin-top: 16px;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .back-link:hover { text-decoration: underline; }
+
+  .pricing-grid {
+    max-width: 800px;
+    margin: 40px auto 60px;
+    padding: 0 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 600px) { .pricing-grid { grid-template-columns: 1fr; } }
+
+  .plan {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px 28px;
+    text-align: center;
+  }
+  .plan.pro {
+    border-color: var(--accent);
+    position: relative;
+  }
+  .plan.pro::before {
+    content: 'MOST VALUE';
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: #fff;
+    padding: 3px 14px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+
+  .plan-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .plan-price { font-size: 40px; font-weight: 800; margin: 12px 0 4px; }
+  .plan-price span { font-size: 16px; font-weight: 400; color: var(--text2); }
+  .plan-desc { color: var(--text2); font-size: 13px; margin-bottom: 24px; }
+
+  .features { text-align: left; list-style: none; margin-bottom: 28px; }
+  .features li {
+    padding: 7px 0;
+    font-size: 13px;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .features li.yes { color: var(--text); }
+  .features li::before { content: '✓'; color: var(--green); font-weight: 700; width: 18px; }
+
+  .cta-btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.12s;
+    text-decoration: none;
+  }
+  .cta-btn.pro-btn {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .cta-btn:hover { transform: translateY(-1px); }
+  .cta-btn.pro-btn:hover { background: #7c6ff7; }
+  .cta-btn.waitlist { opacity: 0.6; cursor: not-allowed; }
+  .cta-btn.waitlist:hover { transform: none; }
+
+  .faq {
+    max-width: 600px;
+    margin: 0 auto 60px;
+    padding: 0 24px;
+  }
+  .faq h3 { font-size: 18px; margin-bottom: 20px; text-align: center; }
+  .faq-item { margin-bottom: 18px; }
+  .faq-q { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .faq-a { color: var(--text2); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Simple, transparent pricing</h1>
+  <p>Free to start. Pro when you need more.</p>
+  <a href="/" class="back-link">← Back to search</a>
+</div>
+
+<div class="pricing-grid">
+  <!-- Free -->
+  <div class="plan">
+    <div class="plan-name">Free</div>
+    <div class="plan-price">€0<span>/month</span></div>
+    <p class="plan-desc">For occasional editors</p>
+    <ul class="features">
+      <li class="yes">10 searches per month</li>
+      <li class="yes">Search Pexels + Pixabay</li>
+      <li class="yes">Download any clip</li>
+      <li class="yes">Variant comparison</li>
+      <li class="yes">No account needed</li>
+    </ul>
+    <a href="/" class="cta-btn">Start searching</a>
+  </div>
+
+  <!-- Pro -->
+  <div class="plan pro">
+    <div class="plan-name">Pro</div>
+    <div class="plan-price">€10.99<span>/month</span></div>
+    <p class="plan-desc">For daily editors</p>
+    <ul class="features">
+      <li class="yes">Unlimited searches</li>
+      <li class="yes">Search all sources</li>
+      <li class="yes">Unlimited downloads</li>
+      <li class="yes">Search history</li>
+      <li class="yes">Saved collections</li>
+    </ul>
+    <button class="cta-btn pro-btn waitlist" title="Coming soon">Coming soon — join waitlist</button>
+  </div>
+</div>
+
+<div class="faq">
+  <h3>FAQ</h3>
+  <div class="faq-item">
+    <div class="faq-q">What counts as a search?</div>
+    <div class="faq-a">Each time you hit Enter or click Search, that's one search. Browsing results or downloading doesn't count.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q">When does the counter reset?</div>
+    <div class="faq-a">On the 1st of every month. You get 10 fresh searches.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q">Can I use the clips commercially?</div>
+    <div class="faq-a">Yes — all clips are from free stock sources (Pexels, Pixabay, Freesound) with royalty-free licenses. Check individual clip licenses for attribution requirements.</div>
+  </div>
+  <div class="faq-item">
+    <div class="faq-q">When is Pro launching?</div>
+    <div class="faq-a">Soon. We're building it right now. Email us to get notified.</div>
+  </div>
+</div>
+
+</body>
+</html>

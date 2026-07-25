@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% if page == 'terms' %}Terms of Use{% elif page == 'privacy' %}Privacy Policy{% elif page == 'license' %}License{% elif page == 'imprint' %}Imprint{% elif page == 'cookies' %}Cookies Policy{% elif page == 'partner' %}Partner with ClipVault{% elif page == 'report' %}Report Content{% endif %} — ClipVault</title>
+<style>
+  :root {
+    --bg: #0d0c0a;
+    --surface: #1a1814;
+    --surface2: #24211c;
+    --border: #2e2a22;
+    --text: #e8e4dc;
+    --text2: #8a8578;
+    --accent: #f0a030;
+    --gold: #c4a86a;
+    --green: #8fb85c;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --font-heading: 'Georgia', 'Times New Roman', serif;
+    --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.7;
+  }
+  body::before {
+    content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+    opacity:0.02;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    background-size:256px 256px;
+  }
+
+  .container { position:relative; z-index:1; max-width:800px; margin:0 auto; padding:40px 24px 80px; }
+
+  .header {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:20px 0 16px; border-bottom:1px solid var(--border); margin-bottom:32px;
+  }
+  .logo { font-family:var(--font-heading); font-size:20px; font-weight:700; color:var(--accent); text-decoration:none; }
+  .logo span { color:var(--text); }
+  .back-link { color:var(--text2); text-decoration:none; font-size:12px; font-weight:600; }
+  .back-link:hover { color:var(--accent); }
+
+  .footer-nav {
+    display:flex; gap:16px; flex-wrap:wrap; padding:0 0 20px;
+    border-bottom:1px solid var(--border); margin-bottom:28px; font-size:12px;
+  }
+  .footer-nav a { color:var(--text2); text-decoration:none; }
+  .footer-nav a:hover, .footer-nav a.active { color:var(--accent); }
+
+  h1 { font-family:var(--font-heading); font-size:28px; font-weight:700; margin-bottom:6px; }
+  .updated { font-size:11px; color:var(--text2); margin-bottom:28px; }
+  h2 { font-family:var(--font-heading); font-size:20px; font-weight:700; margin:28px 0 10px; color:var(--gold); }
+  h3 { font-size:15px; font-weight:700; margin:18px 0 6px; }
+  p { margin-bottom:12px; font-size:14px; }
+  ul, ol { margin:8px 0 16px 20px; font-size:14px; }
+  li { margin-bottom:6px; }
+  a { color:var(--accent); }
+  strong { color:var(--text); }
+  .divider { border:none; border-top:1px solid var(--border); margin:24px 0; }
+
+  @media (max-width:600px) {
+    .container { padding:20px 16px 60px; }
+    h1 { font-size:22px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <a href="/" class="logo">Clip<span>Vault</span></a>
+    <a href="/" class="back-link">← Back to ClipVault</a>
+  </div>
+
+  <div class="footer-nav">
+    <a href="/terms" class="{{ 'active' if page == 'terms' else '' }}">Terms of Use</a>
+    <a href="/privacy" class="{{ 'active' if page == 'privacy' else '' }}">Privacy Policy</a>
+    <a href="/license" class="{{ 'active' if page == 'license' else '' }}">License</a>
+    <a href="/imprint" class="{{ 'active' if page == 'imprint' else '' }}">Imprint</a>
+    <a href="/cookies" class="{{ 'active' if page == 'cookies' else '' }}">Cookies Policy</a>
+    <a href="/partner" class="{{ 'active' if page == 'partner' else '' }}">Partner</a>
+    <a href="/report" class="{{ 'active' if page == 'report' else '' }}">Report Content</a>
+  </div>
+
+  <!-- ═══════ TERMS OF USE ═══════ -->
+  {% if page == 'terms' %}
+  <h1>Terms of Use</h1>
+  <p class="updated">Last updated: July 22, 2026</p>
+
+  <h2>1. Acceptance of Terms</h2>
+  <p>By accessing or using ClipVault ("the Service"), you agree to be bound by these Terms of Use. If you do not agree, do not use the Service.</p>
+
+  <h2>2. The Service</h2>
+  <p>ClipVault is a search and discovery tool that aggregates publicly available, royalty-free stock media from third-party sources including Pexels, Pixabay, Coverr, Vimeo, and Freesound. ClipVault does not host, own, or claim rights to any media content displayed through the Service.</p>
+
+  <h2>3. Content Rights</h2>
+  <p>All media content (videos, images, audio) displayed through ClipVault is provided by third-party sources under their respective licenses. ClipVault displays content as-is from the source APIs and does not modify, relicense, or resell any media.</p>
+  <p>Users are responsible for verifying the license terms of any content they download through ClipVault. Attribution to the original source and creator is required where specified by the source's terms.</p>
+
+  <h2>4. Prohibited Uses</h2>
+  <p>You agree not to:</p>
+  <ul>
+    <li>Use the Service to scrape, mass-download, or systematically collect content</li>
+    <li>Resell or redistribute content as a stock media platform</li>
+    <li>Use content in illegal, defamatory, or harmful ways</li>
+    <li>Misrepresent the source or license of any content</li>
+    <li>Bypass rate limits or abuse the API infrastructure</li>
+  </ul>
+
+  <h2>5. Accounts</h2>
+  <p>ClipVault offers free and paid account tiers. Free tier usage is limited per calendar month. Pro tier provides unlimited access. You are responsible for maintaining the confidentiality of your account credentials.</p>
+
+  <h2>6. Third-Party Sources</h2>
+  <p>ClipVault aggregates results from third-party APIs. We are not responsible for the availability, accuracy, or licensing of content from these sources. Source status is displayed in the application.</p>
+
+  <h2>7. Limitation of Liability</h2>
+  <p>The Service is provided "as is" without warranties of any kind. ClipVault is not liable for damages arising from use of the Service or reliance on content found through it.</p>
+
+  <h2>8. Changes to Terms</h2>
+  <p>We reserve the right to modify these terms. Continued use of the Service after changes constitutes acceptance.</p>
+
+  <h2>9. Contact</h2>
+  <p>For questions about these Terms: <a href="mailto:clipvault@hermes.local">clipvault@hermes.local</a></p>
+
+  <!-- ═══════ PRIVACY POLICY ═══════ -->
+  {% elif page == 'privacy' %}
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: July 22, 2026</p>
+
+  <h2>1. Information We Collect</h2>
+  <p>ClipVault collects minimal data to operate the Service:</p>
+  <ul>
+    <li><strong>Account data:</strong> Email address and hashed password when you create an account</li>
+    <li><strong>Usage data:</strong> Search queries, script-to-clips generations, and feature usage to enforce tier limits</li>
+    <li><strong>Technical data:</strong> IP address (hashed for rate limiting), browser type</li>
+  </ul>
+
+  <h2>2. How We Use Information</h2>
+  <p>We use collected data to:</p>
+  <ul>
+    <li>Provide and improve the Service</li>
+    <li>Enforce free tier limits (searches per month)</li>
+    <li>Improve search relevance through anonymized query analysis</li>
+    <li>Communicate service updates (Pro users only)</li>
+  </ul>
+
+  <h2>3. Data Storage</h2>
+  <p>Account data is stored in a local SQLite database. Search data is temporarily cached for 24 hours as required by our API providers. We do not sell, rent, or share your personal data with third parties.</p>
+
+  <h2>4. Cookies</h2>
+  <p>ClipVault uses essential session cookies for authentication. No tracking or advertising cookies are used. See our <a href="/cookies">Cookies Policy</a> for details.</p>
+
+  <h2>5. Your Rights</h2>
+  <p>You may request access to, correction of, or deletion of your data by contacting us. Account deletion removes all associated data.</p>
+
+  <h2>6. Contact</h2>
+  <p>Privacy questions: <a href="mailto:clipvault@hermes.local">clipvault@hermes.local</a></p>
+
+  <!-- ═══════ LICENSE ═══════ -->
+  {% elif page == 'license' %}
+  <h1>License</h1>
+  <p class="updated">Last updated: July 22, 2026</p>
+
+  <h2>ClipVault Does Not License Content</h2>
+  <p>ClipVault is a search tool — not a content platform. We do not own, host, or license media. All clips found through ClipVault are provided by third-party sources under their own license terms.</p>
+
+  <h2>Source Licenses</h2>
+  <p>Each clip displayed in ClipVault includes its source badge. License terms vary by source:</p>
+  <ul>
+    <li><strong>Pexels:</strong> Pexels License — free for commercial use, no attribution required (attribution appreciated)</li>
+    <li><strong>Pixabay:</strong> Pixabay Content License — free for commercial use, no attribution required</li>
+    <li><strong>Coverr:</strong> Coverr License — free for commercial use, no attribution required</li>
+    <li><strong>Vimeo:</strong> Creative Commons (CC-BY, CC-BY-SA, CC0) — attribution may be required depending on specific license</li>
+    <li><strong>Freesound:</strong> Creative Commons licenses — check individual sound for specific terms</li>
+  </ul>
+
+  <h2>What You Can Do</h2>
+  <ul>
+    <li>Use clips in commercial projects (ads, videos, websites)</li>
+    <li>Modify and edit clips as needed</li>
+    <li>Download and store clips for your projects</li>
+  </ul>
+
+  <h2>What You Cannot Do</h2>
+  <ul>
+    <li>Sell or redistribute clips as standalone stock media</li>
+    <li>Use clips in illegal, defamatory, or harmful contexts</li>
+    <li>Claim ownership of the original content</li>
+    <li>Use clips with identifiable people in sensitive contexts without permission</li>
+  </ul>
+
+  <p><strong>Always verify the license</strong> of any clip before using it commercially. The source link on each clip card takes you to the original page with full license details.</p>
+
+  <!-- ═══════ IMPRINT ═══════ -->
+  {% elif page == 'imprint' %}
+  <h1>Imprint</h1>
+  <p class="updated">Last updated: July 22, 2026</p>
+
+  <h2>Service Operator</h2>
+  <p>ClipVault is operated as a personal project.</p>
+
+  <h2>Contact</h2>
+  <p>Email: <a href="mailto:clipvault@hermes.local">clipvault@hermes.local</a></p>
+
+  <h2>Disclaimer</h2>
+  <p>ClipVault aggregates publicly available content from third-party APIs. We do not host or claim ownership of media content. All trademarks, logos, and brand names are the property of their respective owners. Source attribution is provided with every clip.</p>
+
+  <p>Links to external websites (source pages, original content) are provided for reference. We are not responsible for the content of external sites.</p>
+
+  <!-- ═══════ COOKIES POLICY ═══════ -->
+  {% elif page == 'cookies' %}
+  <h1>Cookies Policy</h1>
+  <p class="updated">Last updated: July 22, 2026</p>
+
+  <h2>Our Use of Cookies</h2>
+  <p>ClipVault uses only essential cookies required for the Service to function:</p>
+
+  <h2>Essential Cookies</h2>
+  <ul>
+    <li><strong>Session cookie:</strong> Maintains your login session while using the Service. Expires when you close your browser.</li>
+    <li><strong>Free tier tracking:</strong> Local browser storage (localStorage) tracks your monthly search count. No cookie is used for this — it stays in your browser.</li>
+  </ul>
+
+  <h2>No Third-Party Cookies</h2>
+  <p>ClipVault does not use:</p>
+  <ul>
+    <li>Advertising cookies</li>
+    <li>Analytics cookies</li>
+    <li>Tracking cookies</li>
+    <li>Social media cookies</li>
+  </ul>
+
+  <h2>Managing Cookies</h2>
+  <p>You can disable cookies in your browser settings. However, the Service requires session cookies for authentication to function.</p>
+
+  <!-- ═══════ PARTNER WITH CLIPVAULT ═══════ -->
+  {% elif page == 'partner' %}
+  <h1>Partner with ClipVault</h1>
+  <p class="updated">Last updated: July 22, 2026</p>
+
+  <h2>Why Partner With Us</h2>
+  <p>ClipVault is a search engine that connects video editors, content creators, and marketers with the perfect stock footage — instantly. We aggregate results from Pexels, Pixabay, Coverr, Vimeo, and Freesound, driving traffic and attribution back to our source partners.</p>
+
+  <h2>Partnership Types</h2>
+
+  <h3>1. Content Source Partners</h3>
+  <p>If you operate a stock media platform with an API, ClipVault can become a distribution channel for your content. We attribute every clip to its source and link back to the original page, driving qualified traffic to your platform.</p>
+  <p><strong>Benefits:</strong></p>
+  <ul>
+    <li>Increased discoverability of your content library</li>
+    <li>Attribution + backlinks from every clip card</li>
+    <li>Access to editors actively searching for clips</li>
+    <li>Free integration — no cost to be listed as a source</li>
+  </ul>
+
+  <h3>2. Tool & Platform Partners</h3>
+  <p>Integrate ClipVault's search directly into your editing software, CMS, or creative tool. Our API can power in-app stock media search so your users never leave their workflow.</p>
+  <p><strong>Use cases:</strong></p>
+  <ul>
+    <li>Video editing plugins (Premiere Pro, DaVinci Resolve, Final Cut)</li>
+    <li>Website builders and CMS platforms</li>
+    <li>Social media scheduling tools</li>
+    <li>Ad creation and creative automation platforms</li>
+  </ul>
+
+  <h3>3. Affiliate Partners</h3>
+  <p>Earn commission by referring editors and creators to ClipVault Pro. Every Pro subscription from your referral earns you recurring revenue.</p>
+
+  <h2>Get in Touch</h2>
+  <p>Interested in partnering? Email us at <a href="mailto:partner@clipvault.local">partner@clipvault.local</a> with a brief description of your platform or integration idea.</p>
+
+  <!-- ═══════ REPORT CONTENT ═══════ -->
+  {% elif page == 'report' %}
+  <h1>Report Content</h1>
+  <p class="updated">Last updated: July 22, 2026</p>
+
+  <h2>Found an Issue?</h2>
+  <p>ClipVault aggregates content from third-party sources. If you encounter content that is:</p>
+  <ul>
+    <li><strong>Copyright infringement</strong> — your work used without permission</li>
+    <li><strong>Inappropriate or harmful</strong> — violates our acceptable use standards</li>
+    <li><strong>Misattributed</strong> — wrong source or author credited</li>
+    <li><strong>Broken</strong> — preview or download link doesn't work</li>
+  </ul>
+
+  <h2>How to Report</h2>
+  <p>To report content, please include the following in your report:</p>
+  <ol>
+    <li><strong>Clip ID or URL</strong> — the exact clip you're reporting</li>
+    <li><strong>Source</strong> — which platform it came from (Pexels, Pixabay, etc.)</li>
+    <li><strong>Issue description</strong> — what's wrong and why</li>
+    <li><strong>Your relationship</strong> — are you the rights holder, or a user reporting an issue?</li>
+  </ol>
+
+  <h2>Copyright Claims</h2>
+  <p>For copyright infringement claims, please include:</p>
+  <ul>
+    <li>Proof of ownership or authorization to act on behalf of the rights holder</li>
+    <li>Identification of the copyrighted work</li>
+    <li>A statement of good faith belief that the use is not authorized</li>
+  </ul>
+
+  <h2>Submit a Report</h2>
+  <p>Email reports to: <a href="mailto:report@clipvault.local">report@clipvault.local</a></p>
+  <p>We review all reports within 48 hours. If the content violates our terms or the source's license, we will remove it from search results immediately.</p>
+
+  <p><strong>Note:</strong> ClipVault does not host content. If your report concerns content hosted on Pexels, Pixabay, or another source, we recommend also reporting it directly to that platform.</p>
+  {% endif %}
+
+</div>
+</body>
+</html>

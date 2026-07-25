@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account — ClipVault</title>
+<style>
+  :root {
+    --bg: #0a0a0b; --surface: #141416; --surface2: #1e1e22; --border: #2a2a30;
+    --text: #e4e4e7; --text2: #8b8b94; --accent: #6c5ce7; --green: #00d68f;
+    --red: #ff4d6a; --radius: 12px; --radius-sm: 8px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+  .header {
+    text-align: center; padding: 48px 24px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.8px;
+    background: linear-gradient(135deg, #a78bfa, #6c5ce7);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .container { max-width: 600px; margin: 40px auto; padding: 0 24px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 28px 24px; margin-bottom: 20px;
+  }
+  .card h3 { font-size: 16px; margin-bottom: 16px; }
+  .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .row:last-child { border-bottom: none; }
+  .row .label { color: var(--text2); }
+  .row .value { font-weight: 600; }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+  }
+  .badge.free { background: rgba(0,214,143,0.15); color: var(--green); }
+  .badge.pro { background: rgba(108,92,231,0.2); color: #a78bfa; }
+  .btn {
+    display: inline-block; padding: 10px 22px; background: var(--accent);
+    color: #fff; border: none; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none;
+    transition: 0.12s;
+  }
+  .btn:hover { background: #7c6ff7; }
+  .btn.outline {
+    background: transparent; border: 1px solid var(--border); color: var(--text2);
+  }
+  .btn.outline:hover { border-color: var(--red); color: var(--red); }
+  .actions { display: flex; gap: 10px; margin-top: 16px; }
+  .back-link { display: block; text-align: center; margin-top: 20px; font-size: 12px; color: var(--text2); text-decoration: none; }
+  .back-link:hover { color: var(--text); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>👤 Account</h1>
+</div>
+
+<div class="container">
+  <div class="card">
+    <h3>Profile</h3>
+    <div class="row">
+      <span class="label">Name</span>
+      <span class="value">{{ user.name or '—' }}</span>
+    </div>
+    <div class="row">
+      <span class="label">Email</span>
+      <span class="value">{{ user.email }}</span>
+    </div>
+    <div class="row">
+      <span class="label">Plan</span>
+      <span class="value"><span class="badge {{ user.plan }}">{{ user.plan.title() }}</span></span>
+    </div>
+    <div class="row">
+      <span class="label">Searches this month</span>
+      <span class="value">{{ searches_used }}/10</span>
+    </div>
+    <div class="row">
+      <span class="label">Member since</span>
+      <span class="value">{{ user.created_at[:10] }}</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Plan</h3>
+    <p style="color:var(--text2);font-size:13px">
+      You're on the <strong>Free</strong> plan — 10 searches/month.<br>
+      Pro (€10.99/month) with unlimited searches coming soon.
+    </p>
+  </div>
+
+  <div class="actions">
+    <a href="/" class="btn">Back to search</a>
+    <a href="/logout" class="btn outline">Log out</a>
+  </div>
+</div>
+
+</body>
+</html>

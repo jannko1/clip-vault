@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign Up — ClipVault</title>
+<style>
+  :root {
+    --bg: #0a0a0b; --surface: #141416; --surface2: #1e1e22; --border: #2a2a30;
+    --text: #e4e4e7; --text2: #8b8b94; --accent: #6c5ce7; --green: #00d68f;
+    --red: #ff4d6a; --radius: 12px; --radius-sm: 8px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  }
+  .auth-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 40px 36px; width: 100%; max-width: 400px;
+  }
+  .auth-card h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 4px; }
+  .auth-card p { color: var(--text2); font-size: 13px; margin-bottom: 28px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block; font-size: 12px; font-weight: 600; color: var(--text2);
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .form-group input {
+    width: 100%; padding: 12px 14px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--text); font-size: 14px; outline: none; transition: 0.15s;
+  }
+  .form-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,92,231,0.15); }
+  .btn {
+    width: 100%; padding: 13px; background: var(--accent); color: #fff;
+    border: none; border-radius: var(--radius-sm); font-size: 14px;
+    font-weight: 700; cursor: pointer; transition: 0.12s; margin-top: 4px;
+  }
+  .btn:hover { background: #7c6ff7; }
+  .alt-link { text-align: center; margin-top: 20px; font-size: 13px; color: var(--text2); }
+  .alt-link a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .alt-link a:hover { text-decoration: underline; }
+  .back-link { display: block; text-align: center; margin-top: 16px; font-size: 12px; color: var(--text2); text-decoration: none; }
+  .back-link:hover { color: var(--text); }
+  .flash { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; margin-bottom: 16px; }
+  .flash.error { background: rgba(255,77,106,0.12); color: var(--red); border: 1px solid rgba(255,77,106,0.3); }
+  .flash.success { background: rgba(0,214,143,0.12); color: var(--green); border: 1px solid rgba(0,214,143,0.3); }
+  .hint { font-size: 11px; color: var(--text2); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div class="auth-card">
+  <h1>Create account</h1>
+  <p>Join ClipVault — free to start</p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <form method="POST">
+    <div class="form-group">
+      <label>Name</label>
+      <input type="text" name="name" placeholder="Your name" required autofocus>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" name="email" placeholder="you@example.com" required>
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" name="password" placeholder="Min 6 characters" required minlength="6">
+      <div class="hint">At least 6 characters</div>
+    </div>
+    <button type="submit" class="btn">Create account</button>
+  </form>
+
+  <div class="alt-link">
+    Already have an account? <a href="/login">Log in</a>
+  </div>
+  <a href="/" class="back-link">← Back to search</a>
+</div>
+
+</body>
+</html>
