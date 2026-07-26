@@ -7,6 +7,8 @@ import json
 import os
 import secrets
 import time
+import hmac
+import hashlib
 import urllib.request
 from pathlib import Path
 from flask import Flask, jsonify, request, render_template, send_from_directory
@@ -35,6 +37,8 @@ PIXABAY_KEY = os.environ.get("PIXABAY_API_KEY") or CONFIG.get("pixabay_api_key",
 COVERR_KEY = os.environ.get("COVERR_API_KEY") or CONFIG.get("coverr_api_key", "")
 VIMEO_TOKEN = os.environ.get("VIMEO_ACCESS_TOKEN") or CONFIG.get("vimeo_access_token", "")
 FREESOUND_TOKEN = os.environ.get("FREESOUND_TOKEN") or CONFIG.get("freesound_token", "")
+STORYBLOCKS_KEY = os.environ.get("STORYBLOCKS_API_KEY") or CONFIG.get("storyblocks_api_key", "")
+STORYBLOCKS_SECRET = os.environ.get("STORYBLOCKS_API_SECRET") or CONFIG.get("storyblocks_api_secret", "")
 DOWNLOAD_DIR = Path(os.environ.get("DOWNLOAD_PATH") or CONFIG.get("download_path", str(Path(__file__).parent / "downloads")))
 try:
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -187,6 +191,58 @@ def search_coverr_videos(query: str, per_page: int = 20) -> list:
             "type": "video",
         })
     return results
+
+
+# ── VIDEO: Storyblocks ─────────────────────────────────
+
+def search_storyblocks_videos(query: str, per_page: int = 20) -> list:
+    if not STORYBLOCKS_KEY or STORYBLOCKS_KEY.startswith("YOUR_"):
+        return []
+    try:
+        resource = "/api/v2/videos/search"
+        expires = str(int(time.time()) + 300)  # 5 min expiry
+        hmac_builder = hmac.new(
+            (STORYBLOCKS_SECRET + expires).encode('utf-8'),
+            resource.encode('utf-8'),
+            hashlib.sha256
+        )
+        hmac_hex = hmac_builder.hexdigest()
+
+        params = {
+            'APIKEY': STORYBLOCKS_KEY,
+            'EXPIRES': expires,
+            'HMAC': hmac_hex,
+            'project_id': 'clipvault',
+            'user_id': 'jan',
+            'keywords': query,
+            'results_per_page': str(per_page),
+            'sort_by': 'most_relevant'
+        }
+        url = f"https://api.storyblocks.com{resource}?{urllib.parse.urlencode(params)}"
+        data = cached_fetch(url)
+
+        results = []
+        for v in data.get("results", []):
+            previews = v.get("preview_urls", {})
+            preview = previews.get("_720p") or previews.get("_480p") or previews.get("_360p", "")
+            results.append({
+                "id": f"storyblocks-{v['id']}",
+                "source": "Storyblocks",
+                "source_url": f"https://www.storyblocks.com/video/stock/{v.get('id','')}",
+                "thumbnail": v.get("thumbnail_url", ""),
+                "preview": preview,
+                "download_url": "",  # Storyblocks API doesn't provide direct download for non-licensed
+                "duration": v.get("duration", 0),
+                "width": 1920,  # Storyblocks doesn't return dimensions in search
+                "height": 1080,
+                "author": "Storyblocks",
+                "description": v.get("title", ""),
+                "type": "video",
+            })
+        return results
+    except Exception as e:
+        print(f"[Storyblocks API Error] {e}")
+        return []
 
 
 # ── PHOTOS: Pexels ─────────────────────────────────────
@@ -345,7 +401,7 @@ def search():
         # Expand query and search all variations (VIDEO ONLY — no images)
         queries = expand_query(query)
         seen_ids = set()
-        source_buckets = {"Pexels": [], "Pixabay": [], "Coverr": []}
+        source_buckets = {"Pexels": [], "Pixabay": [], "Coverr": [], "Storyblocks": []}
 
         for q in queries:
             for r in search_pexels_videos(q):
@@ -360,11 +416,18 @@ def search():
                 if r["id"] not in seen_ids:
                     seen_ids.add(r["id"])
                     source_buckets["Coverr"].append(r)
-        # ── Interleave results round-robin: Pexels, Pixabay, Coverr ──
-        # This ensures all sources get equal visibility
+            try:
+                for r in search_storyblocks_videos(q):
+                    if r["id"] not in seen_ids:
+                        seen_ids.add(r["id"])
+                        source_buckets["Storyblocks"].append(r)
+            except Exception:
+                pass  # Storyblocks unavailable — continue with other sources
+        # ── Interleave results round-robin: Pexels, Pixabay, Coverr, Storyblocks ──
         raw_results = _interleave(source_buckets["Pexels"],
                                   source_buckets["Pixabay"],
-                                  source_buckets["Coverr"])
+                                  source_buckets["Coverr"],
+                                  source_buckets["Storyblocks"])
 
         # ── Log search for future analysis ──
         _log_search(query, len(seen_ids))
@@ -622,4 +685,4 @@ if __name__ == "__main__":
         status.append("❌ Freesound (set token in config.json)")
     print("  " + " | ".join(status))
     print("=" * 50)
-    app.run(debug=True, host="127.0.0.1", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000)
