@@ -224,6 +224,14 @@ def search_storyblocks_videos(query: str, per_page: int = 20) -> list:
         url = f"https://api.storyblocks.com{resource}?{urllib.parse.urlencode(params)}"
         data = cached_fetch(url)
 
+        if not data:
+            print(f"[Storyblocks] Empty response for query: {query}")
+            return []
+
+        if "errors" in data:
+            print(f"[Storyblocks] API errors: {data['errors']}")
+            return []
+
         results = []
         for v in data.get("results", []):
             previews = v.get("preview_urls", {})
