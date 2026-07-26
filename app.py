@@ -337,6 +337,11 @@ def search_freesound(query: str, per_page: int = 20) -> list:
 
 # ── ROUTES ─────────────────────────────────────────────
 
+@app.route("/api/health")
+def health():
+    """Health check — no dependencies."""
+    return jsonify({"status": "ok", "sources": ["pexels", "pixabay", "coverr", "storyblocks"]})
+
 @app.route("/")
 def index():
     return render_template("index.html")

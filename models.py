@@ -203,7 +203,17 @@ def increment_searches(user_id: int):
 
 
 # ── Initialize on import ───────────────────────────────
-try:
-    init_db()
-except Exception as e:
-    print(f"[WARNING] Database init skipped: {e}")
+# Lazy init — don't crash the app if DB isn't available yet
+_init_done = False
+def _lazy_init_db():
+    global _init_done
+    if _init_done:
+        return
+    try:
+        init_db()
+        _init_done = True
+    except Exception as e:
+        print(f"[WARNING] Database init skipped: {e}")
+
+# Don't auto-init on import — let first request trigger it
+
