@@ -39,6 +39,7 @@ VIMEO_TOKEN = os.environ.get("VIMEO_ACCESS_TOKEN") or CONFIG.get("vimeo_access_t
 FREESOUND_TOKEN = os.environ.get("FREESOUND_TOKEN") or CONFIG.get("freesound_token", "")
 STORYBLOCKS_KEY = os.environ.get("STORYBLOCKS_API_KEY") or CONFIG.get("storyblocks_api_key", "")
 STORYBLOCKS_SECRET = os.environ.get("STORYBLOCKS_API_SECRET") or CONFIG.get("storyblocks_api_secret", "")
+EUROPEANA_KEY = os.environ.get("EUROPEANA_API_KEY") or CONFIG.get("europeana_api_key", "")
 DOWNLOAD_DIR = Path(os.environ.get("DOWNLOAD_PATH") or CONFIG.get("download_path", str(Path(__file__).parent / "downloads")))
 try:
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -309,7 +310,137 @@ def search_pixabay_images(query: str, per_page: int = 20) -> list:
     return results
 
 
-# ── VIDEO: Vimeo REMOVED — permanently geo-blocked from Slovenia (HTTP 404 on every call) ─
+# ── IMAGE: Wikimedia Commons ─────────────────────────
+
+def _wikimedia_fetch(url: str) -> dict:
+    """Fetch from Wikimedia API with rate limiting and no caching (avoid 429 cache)."""
+    import time as _time
+    _time.sleep(0.3)
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "ClipVault/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as res:
+            return json.loads(res.read())
+    except Exception:
+        return {}
+
+
+def search_wikimedia(query: str, per_page: int = 20) -> list:
+    """Search Wikimedia Commons for royalty-free images AND videos (no API key needed)."""
+    import urllib.parse
+    base = "https://commons.wikimedia.org/w/api.php"
+    all_titles = []
+    
+    # Search for images (default) and videos (filetype:video)
+    for suffix in ["", "%20filetype:video"]:
+        search_url = (
+            f"{base}?action=query&generator=search&gsrsearch="
+            f"{urllib.parse.quote(query)}{suffix}&gsrnamespace=6&gsrlimit={per_page}"
+            f"&format=json&origin=*"
+        )
+        data = _wikimedia_fetch(search_url)
+        pages = data.get("query", {}).get("pages", {})
+        for p in pages.values():
+            title = p.get("title", "")
+            if title.startswith("File:") and title not in all_titles:
+                all_titles.append(title)
+    
+    if not all_titles:
+        return []
+    
+    # Get license info + URLs for up to 10 files at a time
+    results = []
+    safe_licenses = {"cc0", "cc by", "cc by-sa", "public domain", "pd", "cc-zero"}
+    
+    for batch_start in range(0, len(all_titles), 10):
+        batch = all_titles[batch_start:batch_start + 10]
+        encoded_titles = "|".join(urllib.parse.quote(t, safe="") for t in batch)
+        info_url = (
+            f"{base}?action=query&titles={encoded_titles}"
+            f"&prop=imageinfo&iiprop=extmetadata|url|size|mime"
+            f"&iiurlwidth=640&format=json&origin=*"
+        )
+        info_data = _wikimedia_fetch(info_url)
+        
+        for page_id, page in info_data.get("query", {}).get("pages", {}).items():
+            imageinfo = page.get("imageinfo", [])
+            if not imageinfo:
+                continue
+            info = imageinfo[0]
+            
+            # License check
+            extmeta = info.get("extmetadata", {})
+            license_short = (extmeta.get("LicenseShortName", {}) or {}).get("value", "").lower()
+            
+            if license_short and not any(safe in license_short for safe in safe_licenses):
+                continue
+            
+            # Detect video type from MIME
+            mime = info.get("mime", "")
+            media_type = "video" if ("video" in mime or "ogg" in mime) else "image"
+            
+            results.append({
+                "id": f"wikimedia-{page_id}",
+                "source": "Wikimedia",
+                "source_url": info.get("descriptionurl", ""),
+                "thumbnail": info.get("thumburl", ""),
+                "preview": info.get("url", "") if media_type == "video" else info.get("thumburl", ""),
+                "download_url": info.get("url", ""),
+                "duration": 0,
+                "width": info.get("width", 0),
+                "height": info.get("height", 0),
+                "author": (extmeta.get("Artist", {}) or {}).get("value", "Wikimedia"),
+                "license": license_short,
+                "type": media_type,
+            })
+    return results
+
+
+# ── IMAGE: Europeana ──────────────────────────────────
+
+def search_europeana(query: str, per_page: int = 20) -> list:
+    """Search Europeana for royalty-free images AND videos (needs API key).
+    Uses reusability=open (PD, CC0, CC-BY, CC-BY-SA) + TYPE:VIDEO/IMAGE facets."""
+    if not EUROPEANA_KEY or EUROPEANA_KEY.startswith("YOUR_"):
+        return []
+    
+    results = []
+    # Search both images and videos
+    for type_filter in ["", "&qf=TYPE:VIDEO"]:
+        url = (
+            f"https://api.europeana.eu/record/v2/search.json"
+            f"?wskey={EUROPEANA_KEY}"
+            f"&query={urllib.parse.quote(query)}"
+            f"&reusability=open"
+            f"&media=true&thumbnail=true"
+            f"&rows={per_page // 2}"
+            f"{type_filter}"
+        )
+        data = cached_fetch(url)
+        
+        for item in data.get("items", []):
+            previews = item.get("edmPreview", [])
+            thumb = previews[0] if previews else ""
+            item_type = item.get("type", "").upper()
+            media_type = "video" if ("VIDEO" in item_type or type_filter) else "image"
+            
+            results.append({
+                "id": f"europeana-{item.get('id', '')}",
+                "source": "Europeana",
+                "source_url": item.get("guid", ""),
+                "thumbnail": thumb,
+                "preview": thumb,
+                "download_url": (item.get("edmIsShownBy", [None]) or [None])[0] or thumb,
+                "duration": 0,
+                "width": 0,
+                "height": 0,
+                "author": (item.get("dataProvider", [""]) or [""])[0],
+                "license": (item.get("rights", [""]) or [""])[0],
+                "type": media_type,
+            })
+    return results
+
+
+# ── VIDEO: Vimeo REMOVED — permanently geo-blocked from Slovenia ─
 
 
 # ── SFX: Freesound ─────────────────────────────────────
@@ -573,6 +704,13 @@ def parse_script_endpoint():
                         r["title"] = generate_title(r)
                         src["Coverr"].append(r)
             raw = _interleave(src["Pexels"], src["Pixabay"], src["Coverr"])
+            # Add Wikimedia results (images + videos, royalty-free)
+            for q in queries:
+                for r in search_wikimedia(q):
+                    if r["id"] not in seen:
+                        seen.add(r["id"])
+                        r["title"] = generate_title(r)
+                        raw.append(r)
         else:
             queries = expand_query(query)
             seen = set()
@@ -583,11 +721,12 @@ def parse_script_endpoint():
                         r["title"] = generate_title(r)
                         raw.append(r)
 
-        # Shuffle groups to mix sources, then take top 7 videos only
+        # Shuffle groups to mix sources, then take top 7 (5 video + 2 image)
         grouped = group_duplicates(raw)
         random.shuffle(grouped)
         videos = [g for g in grouped if g["primary"]["type"] == "video"]
-        scene["clips"] = videos[:7] if videos else grouped[:7]
+        images = [g for g in grouped if g["primary"]["type"] != "video"]
+        scene["clips"] = (videos[:5] + images[:2]) if videos else grouped[:7]
         if not scene["clips"]:
             scene["clips"] = grouped[:7]
         scene["total_found"] = len(grouped)
