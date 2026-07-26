@@ -203,7 +203,7 @@ def search_storyblocks_videos(query: str, per_page: int = 20) -> list:
         return []
     try:
         resource = "/api/v2/videos/search"
-        expires = str(int(time.time()) + 300)  # 5 min expiry
+        expires = str(int(time.time()) + 300)
         hmac_builder = hmac.new(
             (STORYBLOCKS_SECRET + expires).encode('utf-8'),
             resource.encode('utf-8'),
@@ -222,14 +222,16 @@ def search_storyblocks_videos(query: str, per_page: int = 20) -> list:
             'sort_by': 'most_relevant'
         }
         url = f"https://api.storyblocks.com{resource}?{urllib.parse.urlencode(params)}"
-        data = cached_fetch(url)
+        # Bypass cached_fetch — use direct call with error visibility
+        req = urllib.request.Request(url, headers={"User-Agent": "ClipVault/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as res:
+            data = json.loads(res.read())
 
         if not data:
-            print(f"[Storyblocks] Empty response for query: {query}")
             return []
 
-        if "errors" in data:
-            print(f"[Storyblocks] API errors: {data['errors']}")
+        total = data.get("total_results", 0)
+        if total == 0:
             return []
 
         results = []
@@ -242,9 +244,9 @@ def search_storyblocks_videos(query: str, per_page: int = 20) -> list:
                 "source_url": f"https://www.storyblocks.com/video/stock/{v.get('id','')}",
                 "thumbnail": v.get("thumbnail_url", ""),
                 "preview": preview,
-                "download_url": "",  # Storyblocks API doesn't provide direct download for non-licensed
+                "download_url": "",
                 "duration": v.get("duration", 0),
-                "width": 1920,  # Storyblocks doesn't return dimensions in search
+                "width": 1920,
                 "height": 1080,
                 "author": "Storyblocks",
                 "description": v.get("title", ""),
@@ -252,7 +254,6 @@ def search_storyblocks_videos(query: str, per_page: int = 20) -> list:
             })
         return results
     except Exception as e:
-        print(f"[Storyblocks API Error] {e}")
         return []
 
 
