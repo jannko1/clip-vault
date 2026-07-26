@@ -343,7 +343,13 @@ def search_freesound(query: str, per_page: int = 20) -> list:
 @app.route("/api/health")
 def health():
     """Health check — no dependencies."""
-    return jsonify({"status": "ok", "sources": ["pexels", "pixabay", "coverr", "storyblocks"]})
+    import os as _os
+    return jsonify({
+        "status": "ok",
+        "sources": ["pexels", "pixabay", "coverr", "storyblocks"],
+        "storyblocks_key": bool(_os.environ.get("STORYBLOCKS_API_KEY", "")),
+        "storyblocks_secret": bool(_os.environ.get("STORYBLOCKS_API_SECRET", ""))
+    })
 
 @app.route("/")
 def index():
