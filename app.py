@@ -365,10 +365,37 @@ def health():
 def test_storyblocks():
     """Direct Storyblocks API test."""
     try:
-        results = search_storyblocks_videos("ocean", 3)
-        return jsonify({"status": "ok", "count": len(results), "sample": results[:1]})
+        resource = "/api/v2/videos/search"
+        expires = str(int(time.time()) + 300)
+        hmac_builder = hmac.new(
+            (STORYBLOCKS_SECRET + expires).encode('utf-8'),
+            resource.encode('utf-8'),
+            hashlib.sha256
+        )
+        hmac_hex = hmac_builder.hexdigest()
+        params = {
+            'APIKEY': STORYBLOCKS_KEY,
+            'EXPIRES': expires,
+            'HMAC': hmac_hex,
+            'project_id': 'clipvault',
+            'user_id': 'jan',
+            'keywords': 'ocean',
+            'results_per_page': '3',
+            'sort_by': 'most_relevant'
+        }
+        url = f"https://api.storyblocks.com{resource}?{urllib.parse.urlencode(params)}"
+        req = urllib.request.Request(url, headers={"User-Agent": "ClipVault/1.0"})
+        with urllib.request.urlopen(req, timeout=15) as res:
+            raw = res.read().decode()
+            data = json.loads(raw)
+        return jsonify({
+            "status": "ok",
+            "total": data.get("total_results", 0),
+            "keys": list(data.keys()),
+            "raw_preview": str(data)[:500]
+        })
     except Exception as e:
-        return jsonify({"status": "error", "detail": str(e)})
+        return jsonify({"status": "error", "detail": str(e), "type": type(e).__name__})
 
 @app.route("/")
 def index():
