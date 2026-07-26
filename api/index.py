@@ -1,8 +1,12 @@
-import json
+"""Vercel serverless entry point for ClipVault."""
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def app(environ, start_response):
-    """Minimal WSGI app — no Flask, no imports, no deps."""
-    status = '200 OK'
-    headers = [('Content-Type', 'application/json')]
-    start_response(status, headers)
-    return [json.dumps({"ok": True, "msg": "Minimal WSGI works!"}).encode()]
+try:
+    from app import app
+except Exception as e:
+    import json, traceback
+    def app(environ, start_response):
+        body = json.dumps({"error": str(e), "trace": traceback.format_exc()})
+        start_response('500 OK', [('Content-Type', 'application/json')])
+        return [body.encode()]
