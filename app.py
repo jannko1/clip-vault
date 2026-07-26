@@ -48,7 +48,10 @@ except Exception:
 
 # ── Search history for learning ──
 SEARCH_LOG_PATH = Path(__file__).parent / "data" / "search_history.json"
-SEARCH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+try:
+    SEARCH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+except (OSError, PermissionError):
+    SEARCH_LOG_PATH = Path("/tmp") / "search_history.json"
 
 def _interleave(*buckets: list) -> list:
     """Interleave items from multiple lists round-robin for fair source distribution."""
