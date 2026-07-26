@@ -360,6 +360,16 @@ def health():
         "storyblocks_secret": bool(_os.environ.get("STORYBLOCKS_API_SECRET", ""))
     })
 
+
+@app.route("/api/test-storyblocks")
+def test_storyblocks():
+    """Direct Storyblocks API test."""
+    try:
+        results = search_storyblocks_videos("ocean", 3)
+        return jsonify({"status": "ok", "count": len(results), "sample": results[:1]})
+    except Exception as e:
+        return jsonify({"status": "error", "detail": str(e)})
+
 @app.route("/")
 def index():
     return render_template("index.html")
