@@ -821,6 +821,7 @@ def parse_script_endpoint():
         return jsonify({"error": "No script text provided"}), 400
 
     scenes = parse_script(script_text)
+    single_source = data.get("source", "")
 
     import random
 
@@ -835,31 +836,51 @@ def parse_script_endpoint():
         if media_type == "video":
             queries = expand_query(query)
             seen = set()
-            src = {"Pexels": [], "Pixabay": [], "Coverr": []}
-            for q in queries:
-                for r in search_pexels_videos(q):
-                    if r["id"] not in seen:
-                        seen.add(r["id"])
-                        r["title"] = generate_title(r)
-                        src["Pexels"].append(r)
-                for r in search_pixabay_videos(q):
-                    if r["id"] not in seen:
-                        seen.add(r["id"])
-                        r["title"] = generate_title(r)
-                        src["Pixabay"].append(r)
-                for r in search_coverr_videos(q):
-                    if r["id"] not in seen:
-                        seen.add(r["id"])
-                        r["title"] = generate_title(r)
-                        src["Coverr"].append(r)
-            raw = _interleave(src["Pexels"], src["Pixabay"], src["Coverr"])
-            # Add Wikimedia results (images + videos, royalty-free)
-            for q in queries:
-                for r in search_wikimedia(q):
-                    if r["id"] not in seen:
-                        seen.add(r["id"])
-                        r["title"] = generate_title(r)
-                        raw.append(r)
+            
+            if single_source == "wikimedia":
+                # Wiki-only mode: search only Wikimedia
+                for q in queries:
+                    for r in search_wikimedia(q):
+                        if r["id"] not in seen:
+                            seen.add(r["id"])
+                            r["title"] = generate_title(r)
+                            raw.append(r)
+            else:
+                # All sources mode
+                src = {"Pexels": [], "Pixabay": [], "Coverr": []}
+                for q in queries:
+                    for r in search_pexels_videos(q):
+                        if r["id"] not in seen:
+                            seen.add(r["id"])
+                            r["title"] = generate_title(r)
+                            src["Pexels"].append(r)
+                    for r in search_pixabay_videos(q):
+                        if r["id"] not in seen:
+                            seen.add(r["id"])
+                            r["title"] = generate_title(r)
+                            src["Pixabay"].append(r)
+                    for r in search_coverr_videos(q):
+                        if r["id"] not in seen:
+                            seen.add(r["id"])
+                            r["title"] = generate_title(r)
+                            src["Coverr"].append(r)
+                raw = _interleave(src["Pexels"], src["Pixabay"], src["Coverr"])
+                # Append Storyblocks + Wikimedia
+                for q in queries:
+                    try:
+                        for r in search_storyblocks_videos(q):
+                            if r["id"] not in seen:
+                                seen.add(r["id"])
+                                r["title"] = generate_title(r)
+                                raw.append(r)
+                    except Exception:
+                        pass
+                for q in queries:
+                    for r in search_wikimedia(q):
+                        if r["id"] not in seen:
+                            seen.add(r["id"])
+                            r["title"] = generate_title(r)
+                            raw.append(r)
         else:
             queries = expand_query(query)
             seen = set()

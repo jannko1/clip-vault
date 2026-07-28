@@ -711,7 +711,7 @@ async function runScriptMode() {
   const btn=$('genBtn'); btn.disabled=true; btn.textContent='⏳ Processing…';
   $('storyboardResults').innerHTML='<div class="cine-load-card"><div class="cine-ring"></div><span>Finding clips...</span></div>';
   try {
-    const res = await fetch('/api/parse-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script:txt,type:'video'})});
+    const res = await fetch('/api/parse-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script:txt,type:'video',source: wikiOnly ? 'wikimedia' : ''})});
     const d = await res.json();
     if(d.error){$('storyboardResults').innerHTML='<div class="empty">'+d.error+'</div>';return}
     scriptScenes = d.scenes; selClips.clear();
