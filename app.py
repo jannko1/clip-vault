@@ -318,7 +318,8 @@ def _wikimedia_fetch(url: str) -> dict:
     """Fetch from Wikimedia API with rate limiting, retry on 429."""
     import time as _time
     for attempt in range(3):
-        _time.sleep(0.3)
+        if attempt > 0:
+            _time.sleep(2 ** attempt)  # Exponential backoff on retry
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "ClipVault/2.0 (https://clipvault.app; jan@clipvault.app)"})
             with urllib.request.urlopen(req, timeout=10) as res:
@@ -509,43 +510,53 @@ def _fetch_metadata_for_titles(titles: list[str]) -> list:
 
 def search_wikimedia(query: str, per_page: int = 20) -> list:
     """
-    Search Wikimedia Commons with 3-layer cascade for maximum hit rate:
-    Layer 1: Query decomposition — search each visual keyword independently
-    Layer 2: SDC depicts filter — boost files with structured data annotations
-    Layer 3: Wikidata entity lookup — semantic precision via Q-ID search
-    Layer 4 (fallback): Original full-phrase gsrsearch
+    Search Wikimedia Commons with 3-layer cascade for maximum hit rate.
+    All independent searches run in parallel for speed.
     """
     keywords = _extract_visual_keywords(query)
+    all_titles = {}  # {title: score}
     
-    # ── Layer 1: Decomposed keyword search ──
-    all_titles = {}
+    # ── Build all search queries to run in parallel ──
+    search_queries = []  # [(query_string, score_weight)]
+    
+    # Layer 1: Decomposed keyword search
     for kw in keywords:
-        for title in _search_titles(f"{kw} filetype:video", per_page):
-            all_titles[title] = all_titles.get(title, 0) + 1
-        # Also search without video filter for broader coverage
-        for title in _search_titles(kw, per_page // 2):
-            if title not in all_titles:
-                all_titles[title] = 1
+        search_queries.append((f"{kw} filetype:video", 1))
+        search_queries.append((kw, 1))  # Also without video filter
     
-    # ── Layer 2: SDC depicts filter (quality boost) ──
-    for kw in keywords[:3]:  # Only top 3 keywords for SDC
-        for title in _search_titles(f"{kw} haswbstatement:P180 filetype:video", per_page // 2):
-            all_titles[title] = all_titles.get(title, 0) + 3  # SDC bonus
+    # Layer 2: SDC depicts filter (quality boost) — only if multiple keywords
+    if len(keywords) >= 1:
+        for kw in keywords[:2]:
+            search_queries.append((f"{kw} haswbstatement:P180 filetype:video", 3))
     
-    # ── Layer 3: Wikidata entity precision ──
+    # Layer 3: Wikidata entity precision
     if keywords:
-        qid = _wikidata_lookup(keywords[0])
+        qid = None
+        try:
+            qid = _wikidata_lookup(keywords[0])
+        except Exception:
+            pass
         if qid:
-            for title in _search_titles(f"haswbstatement:P180={qid} filetype:video", per_page):
-                all_titles[title] = all_titles.get(title, 0) + 5  # Entity bonus
+            search_queries.append((f"haswbstatement:P180={qid} filetype:video", 5))
     
-    # ── Fallback: Full phrase search (if cascade returned < 3 results) ──
-    if len(all_titles) < 3:
-        for title in _search_titles(f"{query} filetype:video", per_page):
-            all_titles[title] = all_titles.get(title, 0) + 2
-        for title in _search_titles(query, per_page):
-            if title not in all_titles:
-                all_titles[title] = 1
+    # Layer 4 (fallback): Full phrase
+    search_queries.append((f"{query} filetype:video", 2))
+    search_queries.append((query, 1))
+    
+    # ── Run all searches in parallel ──
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {
+            executor.submit(_search_titles, q, per_page // 2): (q, weight)
+            for q, weight in search_queries
+        }
+        for future in as_completed(futures):
+            q, weight = futures[future]
+            try:
+                for title in future.result():
+                    all_titles[title] = all_titles.get(title, 0) + weight
+            except Exception:
+                pass
     
     # ── Rank by score, fetch metadata, filter ──
     ranked = sorted(all_titles.items(), key=lambda x: x[1], reverse=True)
@@ -553,7 +564,7 @@ def search_wikimedia(query: str, per_page: int = 20) -> list:
     
     results = _fetch_metadata_for_titles(top_titles)
     
-    # Secondary relevance filter (looser than before — cascade already pre-filters)
+    # Secondary relevance filter
     scored = [(r, _relevance_score(query, r.get("title_raw", ""), r.get("description", ""))) for r in results]
     scored = [(r, s) for r, s in scored if s >= 0.20 or query.lower() in r.get("title_raw", "").lower()]
     scored.sort(key=lambda x: x[1], reverse=True)
