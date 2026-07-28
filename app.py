@@ -582,6 +582,7 @@ def report():
 def search():
     query = request.args.get("q", "").strip()
     media_type = request.args.get("type", "video")  # video | audio
+    single_source = request.args.get("source", "")  # filter to one source: wikimedia, pexels, etc.
 
     if not query:
         return jsonify({"error": "Missing query parameter 'q'"}), 400
@@ -595,39 +596,45 @@ def search():
         source_buckets = {"Pexels": [], "Pixabay": [], "Coverr": [], "Storyblocks": [], "Wikimedia": [], "Europeana": []}
 
         for q in queries:
-            for r in search_pexels_videos(q):
-                if r["id"] not in seen_ids:
-                    seen_ids.add(r["id"])
-                    source_buckets["Pexels"].append(r)
-            for r in search_pixabay_videos(q):
-                if r["id"] not in seen_ids:
-                    seen_ids.add(r["id"])
-                    source_buckets["Pixabay"].append(r)
-            for r in search_coverr_videos(q):
-                if r["id"] not in seen_ids:
-                    seen_ids.add(r["id"])
-                    source_buckets["Coverr"].append(r)
-            try:
-                for r in search_storyblocks_videos(q):
+            if not single_source or single_source == "pexels":
+                for r in search_pexels_videos(q):
                     if r["id"] not in seen_ids:
                         seen_ids.add(r["id"])
-                        source_buckets["Storyblocks"].append(r)
-            except Exception:
-                pass
-            try:
-                for r in search_wikimedia(q):
+                        source_buckets["Pexels"].append(r)
+            if not single_source or single_source == "pixabay":
+                for r in search_pixabay_videos(q):
                     if r["id"] not in seen_ids:
                         seen_ids.add(r["id"])
-                        source_buckets["Wikimedia"].append(r)
-            except Exception:
-                pass
-            try:
-                for r in search_europeana(q):
+                        source_buckets["Pixabay"].append(r)
+            if not single_source or single_source == "coverr":
+                for r in search_coverr_videos(q):
                     if r["id"] not in seen_ids:
                         seen_ids.add(r["id"])
-                        source_buckets["Europeana"].append(r)
-            except Exception:
-                pass
+                        source_buckets["Coverr"].append(r)
+            if not single_source or single_source == "storyblocks":
+                try:
+                    for r in search_storyblocks_videos(q):
+                        if r["id"] not in seen_ids:
+                            seen_ids.add(r["id"])
+                            source_buckets["Storyblocks"].append(r)
+                except Exception:
+                    pass
+            if not single_source or single_source == "wikimedia":
+                try:
+                    for r in search_wikimedia(q):
+                        if r["id"] not in seen_ids:
+                            seen_ids.add(r["id"])
+                            source_buckets["Wikimedia"].append(r)
+                except Exception:
+                    pass
+            if not single_source or single_source == "europeana":
+                try:
+                    for r in search_europeana(q):
+                        if r["id"] not in seen_ids:
+                            seen_ids.add(r["id"])
+                            source_buckets["Europeana"].append(r)
+                except Exception:
+                    pass
         # ── Interleave results round-robin: all 6 sources ──
         raw_results = _interleave(source_buckets["Pexels"],
                                   source_buckets["Pixabay"],
