@@ -10,6 +10,8 @@ import time
 import hmac
 import hashlib
 import urllib.request
+import urllib.error
+import urllib.parse
 from pathlib import Path
 from flask import Flask, jsonify, request, render_template, send_from_directory
 
@@ -313,21 +315,28 @@ def search_pixabay_images(query: str, per_page: int = 20) -> list:
 # ── IMAGE: Wikimedia Commons ─────────────────────────
 
 def _wikimedia_fetch(url: str) -> dict:
-    """Fetch from Wikimedia API with rate limiting and no caching (avoid 429 cache)."""
+    """Fetch from Wikimedia API with rate limiting, retry on 429."""
     import time as _time
-    _time.sleep(0.3)
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "ClipVault/1.0"})
-        with urllib.request.urlopen(req, timeout=10) as res:
-            return json.loads(res.read())
-    except Exception:
-        return {}
+    for attempt in range(3):
+        _time.sleep(0.3)
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "ClipVault/2.0 (https://clipvault.app; jan@clipvault.app)"})
+            with urllib.request.urlopen(req, timeout=10) as res:
+                return json.loads(res.read())
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                _time.sleep(2 ** attempt)  # Exponential backoff
+                continue
+            return {}
+        except Exception:
+            return {}
+    return {}
 
 
 def _extract_visual_keywords(query: str) -> list:
-    """Extract meaningful visual nouns from a descriptive query.
-    Strips filler words, adverbs, articles — keeps nouns, objects, settings, actions."""
-    # Words that don't describe visual content
+    """Extract visual nouns from a descriptive query.
+    Strips stop words, film terms, camera directions — keeps only what you'd SEE.
+    Example: 'close up aerial drone shot of mountains at golden hour' → ['mountains']"""
     stop_words = {
         "a", "an", "the", "in", "on", "at", "to", "for", "of", "with", "by", "from",
         "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
@@ -344,101 +353,110 @@ def _extract_visual_keywords(query: str) -> list:
         "one", "two", "time", "day", "really", "much", "back", "down",
         "right", "left", "around", "never", "always", "ever", "going",
         "yeah", "oh", "um", "er", "ah", "hey", "ok", "alright", "yes",
-        "his", "her", "him", "my", "our", "us", "myself", "yourself",
-        "shot", "scene", "closeup", "medium", "wide", "angle",
+        "his", "her", "him", "our", "us", "myself", "yourself",
+        # Film/camera terms — not visual content
+        "shot", "scene", "closeup", "close", "medium", "wide", "angle",
         "slow", "fast", "motion", "movement", "camera", "footage",
         "color", "tone", "mood", "lighting", "style", "vibe", "feel",
         "shallow", "deep", "depth", "field", "focus", "soft", "hard",
         "warm", "cold", "golden", "blue", "natural", "sunlight",
-        "handheld", "aerial", "drone", "product", "studio",
+        "handheld", "aerial", "drone", "product", "studio", "sun",
+        "hour", "light", "background", "foreground", "cinematic",
+        "4k", "hd", "high", "quality", "view", "looking", "facing",
+        "sipping", "drinking", "walking", "running", "standing",
+        "sitting", "holding", "carrying", "pulling", "pushing",
+        "morning", "evening", "afternoon", "night", "nostalgia",
+        "nostalgic", "retro", "vintage", "modern", "contemporary",
     }
     keywords = []
-    for word in query.lower().replace(",", " ").replace(".", " ").split():
+    for word in query.lower().replace(",", " ").replace(".", " ").replace("-", " ").split():
         w = word.strip().rstrip("s")  # Basic singularization
         if w and len(w) > 1 and w not in stop_words:
             keywords.append(w)
-    return keywords
+    # Remove duplicates while preserving order
+    seen = set()
+    return [kw for kw in keywords if not (kw in seen or seen.add(kw))]
 
 
-def _relevance_score(query: str, title: str, description: str = "") -> float:
-    """Score how relevant a result is to the query. 0.0 = irrelevant, 1.0 = perfect."""
-    keywords = _extract_visual_keywords(query)
-    if not keywords:
-        return 0.5  # Can't judge — pass through
-    
-    text = (title + " " + description).lower()
-    matches = sum(1 for kw in keywords if kw in text)
-    # At least 40% of keywords must match
-    ratio = matches / len(keywords)
-    
-    # Boost for exact phrase matches
-    if query.lower() in text:
-        ratio = min(1.0, ratio + 0.3)
-    
-    return ratio
+# ── Wikidata entity cache ───────────────────────────────
+
+_WIKIDATA_CACHE = {}
 
 
-def search_wikimedia(query: str, per_page: int = 20) -> list:
-    """Search Wikimedia Commons for royalty-free images AND videos (no API key needed).
-    Returns normalized ClipVault results with playable video previews, durations, and thumbnails."""
-    import urllib.parse
-    base = "https://commons.wikimedia.org/w/api.php"
-    all_titles = []
-    
-    # Search for images (default) and videos (filetype:video) for broader results
-    for suffix in ["", "%20filetype:video"]:
-        search_url = (
-            f"{base}?action=query&generator=search&gsrsearch="
-            f"{urllib.parse.quote(query)}{suffix}&gsrnamespace=6&gsrlimit={per_page}"
-            f"&format=json&origin=*"
+def _wikidata_lookup(term: str) -> str | None:
+    """Resolve a term to a Wikidata Q-ID for semantic search."""
+    if term in _WIKIDATA_CACHE:
+        return _WIKIDATA_CACHE[term]
+    try:
+        url = (
+            "https://www.wikidata.org/w/api.php?action=wbsearchentities"
+            f"&search={urllib.parse.quote(term)}&language=en&limit=1&format=json&origin=*"
         )
-        data = _wikimedia_fetch(search_url)
-        pages = data.get("query", {}).get("pages", {})
-        for p in pages.values():
-            title = p.get("title", "")
-            if title.startswith("File:") and title not in all_titles:
-                all_titles.append(title)
-    
-    if not all_titles:
+        req = urllib.request.Request(url, headers={"User-Agent": "ClipVault/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as res:
+            data = json.loads(res.read())
+        results = data.get("search", [])
+        if results:
+            qid = results[0].get("id", "")
+            _WIKIDATA_CACHE[term] = qid
+            return qid
+    except Exception:
+        pass
+    _WIKIDATA_CACHE[term] = None
+    return None
+
+
+# ── Search helpers ──────────────────────────────────────
+
+def _search_titles(query_str: str, limit: int = 20) -> list:
+    """Search Wikimedia and return file titles."""
+    base = "https://commons.wikimedia.org/w/api.php"
+    url = (
+        f"{base}?action=query&generator=search&gsrsearch="
+        f"{urllib.parse.quote(query_str)}&gsrnamespace=6&gsrlimit={limit}"
+        f"&format=json&origin=*"
+    )
+    data = _wikimedia_fetch(url)
+    pages = data.get("query", {}).get("pages", {})
+    return [p.get("title", "") for p in pages.values() if p.get("title", "").startswith("File:")]
+
+
+def _fetch_metadata_for_titles(titles: list[str]) -> list:
+    """Fetch full metadata for file titles, return normalized results."""
+    if not titles:
         return []
-    
-    # Get FULL metadata: license, size, mime, mediatype, metadata (duration, resolution), thumbnail
+    base = "https://commons.wikimedia.org/w/api.php"
     results = []
-    safe_licenses = {"cc0", "cc by", "cc by-sa", "public domain", "pd", "cc-zero"}
-    
-    for batch_start in range(0, len(all_titles), 10):
-        batch = all_titles[batch_start:batch_start + 10]
-        encoded_titles = "|".join(urllib.parse.quote(t, safe="") for t in batch)
-        info_url = (
-            f"{base}?action=query&titles={encoded_titles}"
+
+    for batch_start in range(0, len(titles), 10):
+        batch = titles[batch_start:batch_start + 10]
+        encoded = "|".join(urllib.parse.quote(t, safe="") for t in batch)
+        url = (
+            f"{base}?action=query&titles={encoded}"
             f"&prop=imageinfo&iiprop=extmetadata|url|size|mime|mediatype|metadata"
             f"&iiurlwidth=640&format=json&origin=*"
         )
-        info_data = _wikimedia_fetch(info_url)
-        
-        for page_id, page in info_data.get("query", {}).get("pages", {}).items():
+        data = _wikimedia_fetch(url)
+        for page_id, page in data.get("query", {}).get("pages", {}).items():
             imageinfo = page.get("imageinfo", [])
             if not imageinfo:
                 continue
             info = imageinfo[0]
-            
-            # License check
             extmeta = info.get("extmetadata", {})
             license_short = (extmeta.get("LicenseShortName", {}) or {}).get("value", "").lower()
-            
-            if license_short and not any(safe in license_short for safe in safe_licenses):
+
+            # License filter
+            safe_licenses = {"cc0", "cc by", "cc by-sa", "public domain", "pd", "cc-zero"}
+            if license_short and not any(s in license_short for s in safe_licenses):
                 continue
-            
-            # Detect type
+
             mime = info.get("mime", "")
             mediatype = (info.get("mediatype") or "").upper()
             is_video = "VIDEO" in mediatype or "video" in mime or "ogg" in mime
-            
-            # Parse duration from metadata
+
             duration = 0
             width = info.get("width", 0)
             height = info.get("height", 0)
-            
             for meta in info.get("metadata", []):
                 name = meta.get("name", "")
                 if name == "playtime_seconds":
@@ -449,51 +467,29 @@ def search_wikimedia(query: str, per_page: int = 20) -> list:
                 elif name == "video" and isinstance(meta.get("value"), list):
                     for vitem in meta["value"]:
                         if vitem.get("name") == "resolution_x":
-                            try:
-                                width = int(vitem.get("value", width))
-                            except (ValueError, TypeError):
-                                pass
+                            try: width = int(vitem.get("value", width))
+                            except: pass
                         elif vitem.get("name") == "resolution_y":
-                            try:
-                                height = int(vitem.get("value", height))
-                            except (ValueError, TypeError):
-                                pass
-            
-            # Video preview URL — direct file for inline playback
+                            try: height = int(vitem.get("value", height))
+                            except: pass
+
             raw_url = info.get("url", "")
             thumb_url = info.get("thumburl", "")
-            
             if is_video:
-                # For videos: preview = direct video file (browser-playable WebM/OGG)
                 preview_url = raw_url
-                # Thumbnail: use the generated thumb
                 if not thumb_url and raw_url:
-                    # Fallback: construct thumbnail URL from raw file
                     thumb_url = raw_url + "?width=640"
             else:
-                # For images: preview = thumbnail
                 preview_url = thumb_url or raw_url
-            
-            # Clean title from filename
+
             raw_title = page.get("title", "").replace("File:", "")
             clean_name = raw_title.rsplit(".", 1)[0].replace("_", " ") if "." in raw_title else raw_title.replace("_", " ")
-            
-            # Author
-            author = (extmeta.get("Artist", {}) or {}).get("value", "").strip()
-            if not author:
-                author = "Wikimedia Commons"
-            
-            # ── Relevance check ── filter out garbage results
-            score = _relevance_score(query, clean_name,
-                                     extmeta.get("ImageDescription", {}).get("value", ""))
-            # Require at least 25% keyword overlap, or exact phrase match
-            if score < 0.25 and query.lower() not in clean_name.lower():
-                continue
-            
+            author = (extmeta.get("Artist", {}) or {}).get("value", "").strip() or "Wikimedia Commons"
+
             results.append({
                 "id": f"wikimedia-{page_id}",
                 "source": "Wikimedia",
-                "source_url": info.get("descriptionurl", f"https://commons.wikimedia.org/wiki/{page.get('title', '').replace(' ', '_')}"),
+                "source_url": info.get("descriptionurl", ""),
                 "thumbnail": thumb_url,
                 "preview": preview_url,
                 "download_url": raw_url,
@@ -506,19 +502,76 @@ def search_wikimedia(query: str, per_page: int = 20) -> list:
                 "license": license_short,
                 "type": "video" if is_video else "image",
             })
-    # Sort by relevance
-    results.sort(key=lambda r: _relevance_score(query, r.get("title_raw", ""), r.get("description", "")), reverse=True)
-    
-    # ── Smart fallback: if relevance filtering killed everything, retry with primary keyword only ──
-    if not results and " " in query:
-        keywords = _extract_visual_keywords(query)
-        if keywords:
-            # Retry with just the first (most important) visual keyword
-            primary = keywords[0]
-            if primary != query:
-                return search_wikimedia(primary, per_page)
-    
     return results
+
+
+# ── MAIN SEARCH: 3-Layer Cascade ─────────────────────────
+
+def search_wikimedia(query: str, per_page: int = 20) -> list:
+    """
+    Search Wikimedia Commons with 3-layer cascade for maximum hit rate:
+    Layer 1: Query decomposition — search each visual keyword independently
+    Layer 2: SDC depicts filter — boost files with structured data annotations
+    Layer 3: Wikidata entity lookup — semantic precision via Q-ID search
+    Layer 4 (fallback): Original full-phrase gsrsearch
+    """
+    keywords = _extract_visual_keywords(query)
+    
+    # ── Layer 1: Decomposed keyword search ──
+    all_titles = {}
+    for kw in keywords:
+        for title in _search_titles(f"{kw} filetype:video", per_page):
+            all_titles[title] = all_titles.get(title, 0) + 1
+        # Also search without video filter for broader coverage
+        for title in _search_titles(kw, per_page // 2):
+            if title not in all_titles:
+                all_titles[title] = 1
+    
+    # ── Layer 2: SDC depicts filter (quality boost) ──
+    for kw in keywords[:3]:  # Only top 3 keywords for SDC
+        for title in _search_titles(f"{kw} haswbstatement:P180 filetype:video", per_page // 2):
+            all_titles[title] = all_titles.get(title, 0) + 3  # SDC bonus
+    
+    # ── Layer 3: Wikidata entity precision ──
+    if keywords:
+        qid = _wikidata_lookup(keywords[0])
+        if qid:
+            for title in _search_titles(f"haswbstatement:P180={qid} filetype:video", per_page):
+                all_titles[title] = all_titles.get(title, 0) + 5  # Entity bonus
+    
+    # ── Fallback: Full phrase search (if cascade returned < 3 results) ──
+    if len(all_titles) < 3:
+        for title in _search_titles(f"{query} filetype:video", per_page):
+            all_titles[title] = all_titles.get(title, 0) + 2
+        for title in _search_titles(query, per_page):
+            if title not in all_titles:
+                all_titles[title] = 1
+    
+    # ── Rank by score, fetch metadata, filter ──
+    ranked = sorted(all_titles.items(), key=lambda x: x[1], reverse=True)
+    top_titles = [t for t, score in ranked[:per_page * 2]]
+    
+    results = _fetch_metadata_for_titles(top_titles)
+    
+    # Secondary relevance filter (looser than before — cascade already pre-filters)
+    scored = [(r, _relevance_score(query, r.get("title_raw", ""), r.get("description", ""))) for r in results]
+    scored = [(r, s) for r, s in scored if s >= 0.20 or query.lower() in r.get("title_raw", "").lower()]
+    scored.sort(key=lambda x: x[1], reverse=True)
+    
+    return [r for r, s in scored[:per_page]]
+
+
+def _relevance_score(query: str, title: str, description: str = "") -> float:
+    """Score result relevance to query. 0.0 = irrelevant, 1.0 = perfect."""
+    keywords = _extract_visual_keywords(query)
+    if not keywords:
+        return 0.5
+    text = (title + " " + description).lower()
+    matches = sum(1 for kw in keywords if kw in text)
+    ratio = matches / len(keywords)
+    if query.lower() in text:
+        ratio = min(1.0, ratio + 0.3)
+    return ratio
 
 
 # ── IMAGE: Europeana ──────────────────────────────────
