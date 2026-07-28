@@ -486,7 +486,7 @@ def health():
     import os as _os
     return jsonify({
         "status": "ok",
-        "sources": ["pexels", "pixabay", "coverr", "storyblocks"],
+        "sources": ["pexels", "pixabay", "coverr", "storyblocks", "wikimedia", "europeana"],
         "storyblocks_key": bool(_os.environ.get("STORYBLOCKS_API_KEY", "")),
         "storyblocks_secret": bool(_os.environ.get("STORYBLOCKS_API_SECRET", ""))
     })
@@ -592,7 +592,7 @@ def search():
         # Expand query and search all variations (VIDEO ONLY — no images)
         queries = expand_query(query)
         seen_ids = set()
-        source_buckets = {"Pexels": [], "Pixabay": [], "Coverr": [], "Storyblocks": []}
+        source_buckets = {"Pexels": [], "Pixabay": [], "Coverr": [], "Storyblocks": [], "Wikimedia": [], "Europeana": []}
 
         for q in queries:
             for r in search_pexels_videos(q):
@@ -613,12 +613,28 @@ def search():
                         seen_ids.add(r["id"])
                         source_buckets["Storyblocks"].append(r)
             except Exception:
-                pass  # Storyblocks unavailable — continue with other sources
-        # ── Interleave results round-robin: Pexels, Pixabay, Coverr, Storyblocks ──
+                pass
+            try:
+                for r in search_wikimedia(q):
+                    if r["id"] not in seen_ids:
+                        seen_ids.add(r["id"])
+                        source_buckets["Wikimedia"].append(r)
+            except Exception:
+                pass
+            try:
+                for r in search_europeana(q):
+                    if r["id"] not in seen_ids:
+                        seen_ids.add(r["id"])
+                        source_buckets["Europeana"].append(r)
+            except Exception:
+                pass
+        # ── Interleave results round-robin: all 6 sources ──
         raw_results = _interleave(source_buckets["Pexels"],
                                   source_buckets["Pixabay"],
                                   source_buckets["Coverr"],
-                                  source_buckets["Storyblocks"])
+                                  source_buckets["Storyblocks"],
+                                  source_buckets["Wikimedia"],
+                                  source_buckets["Europeana"])
 
         # ── Log search for future analysis ──
         _log_search(query, len(seen_ids))
