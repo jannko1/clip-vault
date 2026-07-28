@@ -324,6 +324,60 @@ def _wikimedia_fetch(url: str) -> dict:
         return {}
 
 
+def _extract_visual_keywords(query: str) -> list:
+    """Extract meaningful visual nouns from a descriptive query.
+    Strips filler words, adverbs, articles — keeps nouns, objects, settings, actions."""
+    # Words that don't describe visual content
+    stop_words = {
+        "a", "an", "the", "in", "on", "at", "to", "for", "of", "with", "by", "from",
+        "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+        "do", "does", "did", "will", "would", "could", "should", "may", "might",
+        "can", "shall", "you", "i", "me", "my", "we", "our", "they", "them",
+        "this", "that", "these", "those", "what", "which", "who", "how", "when",
+        "and", "or", "but", "not", "no", "so", "if", "then", "than", "too",
+        "very", "just", "about", "up", "out", "there", "here", "all", "each",
+        "every", "both", "few", "more", "most", "other", "some", "such",
+        "only", "own", "same", "into", "over", "under", "again", "once",
+        "now", "also", "get", "got", "make", "made", "like", "know", "see",
+        "look", "want", "need", "come", "take", "give", "use", "find",
+        "still", "well", "way", "even", "new", "good", "any", "thing",
+        "one", "two", "time", "day", "really", "much", "back", "down",
+        "right", "left", "around", "never", "always", "ever", "going",
+        "yeah", "oh", "um", "er", "ah", "hey", "ok", "alright", "yes",
+        "his", "her", "him", "my", "our", "us", "myself", "yourself",
+        "shot", "scene", "closeup", "medium", "wide", "angle",
+        "slow", "fast", "motion", "movement", "camera", "footage",
+        "color", "tone", "mood", "lighting", "style", "vibe", "feel",
+        "shallow", "deep", "depth", "field", "focus", "soft", "hard",
+        "warm", "cold", "golden", "blue", "natural", "sunlight",
+        "handheld", "aerial", "drone", "product", "studio",
+    }
+    keywords = []
+    for word in query.lower().replace(",", " ").replace(".", " ").split():
+        w = word.strip().rstrip("s")  # Basic singularization
+        if w and len(w) > 1 and w not in stop_words:
+            keywords.append(w)
+    return keywords
+
+
+def _relevance_score(query: str, title: str, description: str = "") -> float:
+    """Score how relevant a result is to the query. 0.0 = irrelevant, 1.0 = perfect."""
+    keywords = _extract_visual_keywords(query)
+    if not keywords:
+        return 0.5  # Can't judge — pass through
+    
+    text = (title + " " + description).lower()
+    matches = sum(1 for kw in keywords if kw in text)
+    # At least 40% of keywords must match
+    ratio = matches / len(keywords)
+    
+    # Boost for exact phrase matches
+    if query.lower() in text:
+        ratio = min(1.0, ratio + 0.3)
+    
+    return ratio
+
+
 def search_wikimedia(query: str, per_page: int = 20) -> list:
     """Search Wikimedia Commons for royalty-free images AND videos (no API key needed).
     Returns normalized ClipVault results with playable video previews, durations, and thumbnails."""
@@ -429,6 +483,13 @@ def search_wikimedia(query: str, per_page: int = 20) -> list:
             if not author:
                 author = "Wikimedia Commons"
             
+            # ── Relevance check ── filter out garbage results
+            score = _relevance_score(query, clean_name,
+                                     extmeta.get("ImageDescription", {}).get("value", ""))
+            # Require at least 25% keyword overlap, or exact phrase match
+            if score < 0.25 and query.lower() not in clean_name.lower():
+                continue
+            
             results.append({
                 "id": f"wikimedia-{page_id}",
                 "source": "Wikimedia",
@@ -445,6 +506,18 @@ def search_wikimedia(query: str, per_page: int = 20) -> list:
                 "license": license_short,
                 "type": "video" if is_video else "image",
             })
+    # Sort by relevance
+    results.sort(key=lambda r: _relevance_score(query, r.get("title_raw", ""), r.get("description", "")), reverse=True)
+    
+    # ── Smart fallback: if relevance filtering killed everything, retry with primary keyword only ──
+    if not results and " " in query:
+        keywords = _extract_visual_keywords(query)
+        if keywords:
+            # Retry with just the first (most important) visual keyword
+            primary = keywords[0]
+            if primary != query:
+                return search_wikimedia(primary, per_page)
+    
     return results
 
 
