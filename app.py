@@ -325,12 +325,13 @@ def _wikimedia_fetch(url: str) -> dict:
 
 
 def search_wikimedia(query: str, per_page: int = 20) -> list:
-    """Search Wikimedia Commons for royalty-free images AND videos (no API key needed)."""
+    """Search Wikimedia Commons for royalty-free images AND videos (no API key needed).
+    Returns normalized ClipVault results with playable video previews, durations, and thumbnails."""
     import urllib.parse
     base = "https://commons.wikimedia.org/w/api.php"
     all_titles = []
     
-    # Search for images (default) and videos (filetype:video)
+    # Search for images (default) and videos (filetype:video) for broader results
     for suffix in ["", "%20filetype:video"]:
         search_url = (
             f"{base}?action=query&generator=search&gsrsearch="
@@ -347,7 +348,7 @@ def search_wikimedia(query: str, per_page: int = 20) -> list:
     if not all_titles:
         return []
     
-    # Get license info + URLs for up to 10 files at a time
+    # Get FULL metadata: license, size, mime, mediatype, metadata (duration, resolution), thumbnail
     results = []
     safe_licenses = {"cc0", "cc by", "cc by-sa", "public domain", "pd", "cc-zero"}
     
@@ -356,7 +357,7 @@ def search_wikimedia(query: str, per_page: int = 20) -> list:
         encoded_titles = "|".join(urllib.parse.quote(t, safe="") for t in batch)
         info_url = (
             f"{base}?action=query&titles={encoded_titles}"
-            f"&prop=imageinfo&iiprop=extmetadata|url|size|mime"
+            f"&prop=imageinfo&iiprop=extmetadata|url|size|mime|mediatype|metadata"
             f"&iiurlwidth=640&format=json&origin=*"
         )
         info_data = _wikimedia_fetch(info_url)
@@ -374,23 +375,75 @@ def search_wikimedia(query: str, per_page: int = 20) -> list:
             if license_short and not any(safe in license_short for safe in safe_licenses):
                 continue
             
-            # Detect video type from MIME
+            # Detect type
             mime = info.get("mime", "")
-            media_type = "video" if ("video" in mime or "ogg" in mime) else "image"
+            mediatype = (info.get("mediatype") or "").upper()
+            is_video = "VIDEO" in mediatype or "video" in mime or "ogg" in mime
+            
+            # Parse duration from metadata
+            duration = 0
+            width = info.get("width", 0)
+            height = info.get("height", 0)
+            
+            for meta in info.get("metadata", []):
+                name = meta.get("name", "")
+                if name == "playtime_seconds":
+                    try:
+                        duration = float(meta.get("value", 0))
+                    except (ValueError, TypeError):
+                        pass
+                elif name == "video" and isinstance(meta.get("value"), list):
+                    for vitem in meta["value"]:
+                        if vitem.get("name") == "resolution_x":
+                            try:
+                                width = int(vitem.get("value", width))
+                            except (ValueError, TypeError):
+                                pass
+                        elif vitem.get("name") == "resolution_y":
+                            try:
+                                height = int(vitem.get("value", height))
+                            except (ValueError, TypeError):
+                                pass
+            
+            # Video preview URL — direct file for inline playback
+            raw_url = info.get("url", "")
+            thumb_url = info.get("thumburl", "")
+            
+            if is_video:
+                # For videos: preview = direct video file (browser-playable WebM/OGG)
+                preview_url = raw_url
+                # Thumbnail: use the generated thumb
+                if not thumb_url and raw_url:
+                    # Fallback: construct thumbnail URL from raw file
+                    thumb_url = raw_url + "?width=640"
+            else:
+                # For images: preview = thumbnail
+                preview_url = thumb_url or raw_url
+            
+            # Clean title from filename
+            raw_title = page.get("title", "").replace("File:", "")
+            clean_name = raw_title.rsplit(".", 1)[0].replace("_", " ") if "." in raw_title else raw_title.replace("_", " ")
+            
+            # Author
+            author = (extmeta.get("Artist", {}) or {}).get("value", "").strip()
+            if not author:
+                author = "Wikimedia Commons"
             
             results.append({
                 "id": f"wikimedia-{page_id}",
                 "source": "Wikimedia",
-                "source_url": info.get("descriptionurl", ""),
-                "thumbnail": info.get("thumburl", ""),
-                "preview": info.get("url", "") if media_type == "video" else info.get("thumburl", ""),
-                "download_url": info.get("url", ""),
-                "duration": 0,
-                "width": info.get("width", 0),
-                "height": info.get("height", 0),
-                "author": (extmeta.get("Artist", {}) or {}).get("value", "Wikimedia"),
+                "source_url": info.get("descriptionurl", f"https://commons.wikimedia.org/wiki/{page.get('title', '').replace(' ', '_')}"),
+                "thumbnail": thumb_url,
+                "preview": preview_url,
+                "download_url": raw_url,
+                "duration": duration,
+                "width": width,
+                "height": height,
+                "author": author,
+                "description": extmeta.get("ImageDescription", {}).get("value", "") or clean_name,
+                "title_raw": clean_name,
                 "license": license_short,
-                "type": media_type,
+                "type": "video" if is_video else "image",
             })
     return results
 

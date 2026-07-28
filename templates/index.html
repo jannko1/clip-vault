@@ -315,6 +315,22 @@
   .btn.primary { background: var(--accent); color: #fff; }
   .btn.primary:hover { filter: brightness(1.1); }
   .btn.primary:disabled { opacity: 0.4; cursor: not-allowed; filter: none; }
+  /* Wikimedia toggle switch */
+  .wiki-toggle {
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    user-select: none; font-size: 11px; color: var(--text2);
+    background: rgba(124,92,231,0.12); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 3px 10px;
+    transition: 0.15s;
+  }
+  .wiki-toggle:hover { border-color: var(--accent); }
+  .wiki-toggle input { display: none; }
+  .wiki-toggle:has(input:checked) {
+    background: rgba(124,92,231,0.22); border-color: var(--accent);
+    color: var(--accent);
+  }
+  .toggle-label { font-weight: 600; }
+  .wiki-toggle:has(input:checked) .toggle-label::before { content: "✅ "; }
   .btn.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn.secondary:hover { border-color: var(--border-hover); }
   .btn.small { padding: 5px 12px; font-size: 10px; }
@@ -475,6 +491,8 @@
           <button class="filter-btn" data-flt="Pexels">Pexels</button>
           <button class="filter-btn" data-flt="Pixabay">Pixabay</button>
           <button class="filter-btn" data-flt="Coverr">Coverr</button>
+          <button class="filter-btn" data-flt="Wikimedia">📚 Wiki</button>
+          <button class="filter-btn" data-flt="Storyblocks">🔷 Blocks</button>
           <button class="filter-btn" data-flt="Freesound">Freesound</button>
           <span style="width:1px;background:var(--border);margin:2px 4px"></span>
           <button class="filter-btn" data-flt="short">&lt;10s</button>
@@ -504,6 +522,10 @@
         <div class="panel script-panel">
           <div class="panel-header">
             <span>✏️ Describe each shot</span>
+            <label class="wiki-toggle" title="Search only Wikimedia Commons for royalty-free clips">
+              <input type="checkbox" id="wikiOnlyToggle" onchange="onWikiToggle()">
+              <span class="toggle-label">📚 Wiki only</span>
+            </label>
             <button class="btn small secondary" onclick="loadSampleScript()">Load examples</button>
           </div>
           <textarea id="scriptInput" placeholder="Describe what you need — one shot per line...
@@ -619,7 +641,7 @@ async function doSearch() {
   $('results').innerHTML = '<div class="empty"><div class="loading-dots"><span></span><span></span><span></span></div>Searching…</div>';
   $('sBtn').disabled = true;
   try {
-    const res = await fetch('/api/search?q='+encodeURIComponent(q)+'&type='+searchType);
+    const res = await fetch('/api/search?q='+encodeURIComponent(q)+'&type='+searchType + (wikiOnly ? '&source=wikimedia' : ''));
     const d = await res.json();
     if(d.error){$('results').innerHTML='<div class="empty">'+d.error+'</div>';return}
     allGroups = d.groups||[];
@@ -635,7 +657,7 @@ function filterGroups(gs) {
   if(activeFilter==='all') return gs;
   return gs.filter(g=>{
     const p=g.primary;
-    if(['Pexels','Pixabay','Coverr','Freesound'].includes(activeFilter)) return p.source===activeFilter;
+    if(['Pexels','Pixabay','Coverr','Wikimedia','Storyblocks','Freesound'].includes(activeFilter)) return p.source===activeFilter;
     const d=p.duration||0;
     if(activeFilter==='short') return d<10; if(activeFilter==='med') return d>=10&&d<=30; if(activeFilter==='long') return d>30;
     if(activeFilter==='horiz') return p.width&&p.height&&p.width>p.height;
@@ -675,6 +697,10 @@ function playAudio(url) {
 }
 
 // ═══════ SCRIPT → CLIPS MODE ═══════
+let wikiOnly = false;
+function onWikiToggle() {
+  wikiOnly = document.getElementById('wikiOnlyToggle').checked;
+}
 function loadSampleScript() {
   $('scriptInput').value = 'Wide aerial drone shot of snow-covered mountains at golden hour, slow movement, cold blue tones\nClose-up macro of a chicken coop door opening slowly, warm morning sunlight, shallow depth of field\nHand pressing a button on an automatic gate, focus pull from finger to door mechanism\nHappy chickens running out of a coop into a sunny green backyard, handheld following shot\nFamily collecting eggs together, children laughing, natural backlight, warm golden tones\nProduct shot of AutoGate on a clean white background, soft studio lighting, slow rotate';
 }
