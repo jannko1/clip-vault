@@ -541,8 +541,13 @@ def search_wikimedia(query: str, per_page: int = 20) -> list:
     has_action = any(kw in action_words for kw in keywords)
     has_lifestyle = any(kw in lifestyle_words for kw in keywords)
     
+    # Also check raw query for action words (they get stripped from keywords)
+    raw_words = query.lower().replace(",", " ").replace(".", " ").split()
+    raw_has_action = any(w in action_words for w in raw_words)
+    raw_has_people = any(w in people_words for w in raw_words)
+    
     # If query is about people/actions/lifestyle, Wikimedia won't have good results
-    if (has_people and has_action) or has_lifestyle:
+    if (has_people or raw_has_people) and (has_action or raw_has_action or has_lifestyle):
         return _empty_wikimedia_result(query,
             "Wikimedia is an educational archive — not a stock footage library. "
             "Try unchecking 'Wiki Only' for lifestyle/people footage from Pexels & Pixabay.")
