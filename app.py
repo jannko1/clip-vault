@@ -510,26 +510,91 @@ def _fetch_metadata_for_titles(titles: list[str]) -> list:
 
 def search_wikimedia(query: str, per_page: int = 20) -> list:
     """
-    Search Wikimedia Commons with 3-layer cascade for maximum hit rate.
-    All independent searches run in parallel for speed.
+    Search Wikimedia Commons with 3-layer cascade.
+    BUT: Wikimedia is an educational archive, NOT a stock footage library.
+    For people/action/lifestyle queries, it will return garbage.
     """
     keywords = _extract_visual_keywords(query)
-    all_titles = {}  # {title: score}
     
-    # ── Build all search queries to run in parallel ──
-    search_queries = []  # [(query_string, score_weight)]
+    # ── Query classification: is Wikimedia the right source? ──
+    # Wikimedia is good for: landscapes, nature, animals, architecture, science, space
+    # Wikimedia is TERRIBLE for: people, actions, lifestyle, emotions
+    people_words = {
+        'woman', 'women', 'man', 'men', 'boy', 'girl', 'child', 'children',
+        'person', 'people', 'family', 'couple', 'baby', 'friend', 'group',
+        'crowd', 'worker', 'customer', 'patient', 'model', 'actor',
+    }
+    action_words = {
+        'walking', 'running', 'sitting', 'standing', 'talking', 'laughing',
+        'smiling', 'crying', 'eating', 'cooking', 'holding', 'carrying',
+        'dancing', 'jumping', 'playing', 'working', 'typing', 'writing',
+        'reading', 'sleeping', 'driving', 'riding', 'flying', 'swimming',
+        'hugging', 'kissing', 'shaking', 'pointing', 'waving', 'drinking',
+    }
+    lifestyle_words = {
+        'office', 'meeting', 'business', 'corporate', 'startup', 'workout',
+        'gym', 'fitness', 'yoga', 'party', 'wedding', 'celebration',
+        'shopping', 'store', 'restaurant', 'cafe', 'kitchen', 'bathroom',
+    }
     
-    # Layer 1: Decomposed keyword search
+    has_people = any(kw in people_words for kw in keywords)
+    has_action = any(kw in action_words for kw in keywords)
+    has_lifestyle = any(kw in lifestyle_words for kw in keywords)
+    
+    # If query is about people/actions/lifestyle, Wikimedia won't have good results
+    if (has_people and has_action) or has_lifestyle:
+        return _empty_wikimedia_result(query,
+            "Wikimedia is an educational archive — not a stock footage library. "
+            "Try unchecking 'Wiki Only' for lifestyle/people footage from Pexels & Pixabay.")
+    
+    # If just "people on beach" or similar (people + location), degrade gracefully
+    if has_people:
+        # Try searching without the people word — just the location/nature terms
+        nature_kw = [kw for kw in keywords if kw not in people_words and kw not in action_words]
+        if nature_kw:
+            # Replace the people term with the nature term for search
+            return _run_cascade(nature_kw, query, per_page)
+        return _empty_wikimedia_result(query,
+            "Wikimedia doesn't have good footage of people. "
+            "Try searching for landscapes, nature, or architecture instead.")
+    
+    return _run_cascade(keywords, query, per_page)
+
+
+def _empty_wikimedia_result(query: str, message: str) -> list:
+    """Return an informational 'no results' placeholder for the frontend."""
+    return [{
+        "id": "wikimedia-empty",
+        "source": "Wikimedia",
+        "source_url": "",
+        "thumbnail": "",
+        "preview": "",
+        "download_url": "",
+        "duration": 0,
+        "width": 0,
+        "height": 0,
+        "author": "",
+        "description": f"⚠️ {message}",
+        "title_raw": f"No results: {query}",
+        "license": "",
+        "type": "placeholder",
+        "_message": message,
+    }]
+
+
+def _run_cascade(keywords: list, query: str, per_page: int) -> list:
+    """Run the parallel cascade search (original implementation)."""
+    all_titles = {}
+    search_queries = []
+    
     for kw in keywords:
         search_queries.append((f"{kw} filetype:video", 1))
-        search_queries.append((kw, 1))  # Also without video filter
+        search_queries.append((kw, 1))
     
-    # Layer 2: SDC depicts filter (quality boost) — only if multiple keywords
     if len(keywords) >= 1:
         for kw in keywords[:2]:
             search_queries.append((f"{kw} haswbstatement:P180 filetype:video", 3))
     
-    # Layer 3: Wikidata entity precision
     if keywords:
         qid = None
         try:
@@ -539,11 +604,9 @@ def search_wikimedia(query: str, per_page: int = 20) -> list:
         if qid:
             search_queries.append((f"haswbstatement:P180={qid} filetype:video", 5))
     
-    # Layer 4 (fallback): Full phrase
     search_queries.append((f"{query} filetype:video", 2))
     search_queries.append((query, 1))
     
-    # ── Run all searches in parallel ──
     from concurrent.futures import ThreadPoolExecutor, as_completed
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {
@@ -558,13 +621,10 @@ def search_wikimedia(query: str, per_page: int = 20) -> list:
             except Exception:
                 pass
     
-    # ── Rank by score, fetch metadata, filter ──
     ranked = sorted(all_titles.items(), key=lambda x: x[1], reverse=True)
     top_titles = [t for t, score in ranked[:per_page * 2]]
-    
     results = _fetch_metadata_for_titles(top_titles)
     
-    # Secondary relevance filter
     scored = [(r, _relevance_score(query, r.get("title_raw", ""), r.get("description", ""))) for r in results]
     scored = [(r, s) for r, s in scored if s >= 0.20 or query.lower() in r.get("title_raw", "").lower()]
     scored.sort(key=lambda x: x[1], reverse=True)
@@ -812,6 +872,8 @@ def search():
             if not single_source or single_source == "wikimedia":
                 try:
                     for r in search_wikimedia(q):
+                        if r.get("type") == "placeholder":
+                            continue  # Skip "no results" messages
                         if r["id"] not in seen_ids:
                             seen_ids.add(r["id"])
                             source_buckets["Wikimedia"].append(r)
