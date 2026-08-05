@@ -19,6 +19,7 @@ from titles import generate_title, clean_title
 from dedup import group_duplicates
 from keywords import expand_query
 from script_parser import parse_script
+from wikimedia_local import search_wikimedia_local, index_stats as wikimedia_index_stats
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
@@ -510,12 +511,16 @@ def _fetch_metadata_for_titles(titles: list[str]) -> list:
 
 def search_wikimedia(query: str, per_page: int = 20) -> list:
     """
-    Search Wikimedia Commons with 3-layer cascade.
-    BUT: Wikimedia is an educational archive, NOT a stock footage library.
-    For people/action/lifestyle queries, it will return garbage.
+    Search Wikimedia Commons — local index first, API cascade as fallback.
     """
+    # ── Layer 0: Local SQLite index (instant) ──
+    local_results = search_wikimedia_local(query, per_page=per_page)
+    if len(local_results) >= 10:
+        # Local index has enough results — skip API entirely
+        return local_results[:per_page]
+
     keywords = _extract_visual_keywords(query)
-    
+
     # ── Query classification: is Wikimedia the right source? ──
     # Wikimedia is good for: landscapes, nature, animals, architecture, science, space
     # Wikimedia is TERRIBLE for: people, actions, lifestyle, emotions
@@ -1151,13 +1156,14 @@ def download():
 def status():
     """Check which APIs are configured."""
     return jsonify({
-        "pexels_videos": bool(PEXELS_KEY and not PEXELS_KEY.startswith("YOUR_")),
-        "pixabay_videos": bool(PIXABAY_KEY and not PIXABAY_KEY.startswith("YOUR_")),
-        "coverr": bool(COVERR_KEY and not COVERR_KEY.startswith("YOUR_")),
-        "pexels_photos": bool(PEXELS_KEY and not PEXELS_KEY.startswith("YOUR_")),
-        "pixabay_photos": bool(PIXABAY_KEY and not PIXABAY_KEY.startswith("YOUR_")),
-        "freesound": bool(FREESOUND_TOKEN and not FREESOUND_TOKEN.startswith("YOUR_")),
-    })
+            "pexels_videos": bool(PEXELS_KEY and not PEXELS_KEY.startswith("YOUR_")),
+            "pixabay_videos": bool(PIXABAY_KEY and not PIXABAY_KEY.startswith("YOUR_")),
+            "coverr": bool(COVERR_KEY and not COVERR_KEY.startswith("YOUR_")),
+            "pexels_photos": bool(PEXELS_KEY and not PEXELS_KEY.startswith("YOUR_")),
+            "pixabay_photos": bool(PIXABAY_KEY and not PIXABAY_KEY.startswith("YOUR_")),
+            "freesound": bool(FREESOUND_TOKEN and not FREESOUND_TOKEN.startswith("YOUR_")),
+            "wikimedia_local": wikimedia_index_stats(),
+        })
 
 
 if __name__ == "__main__":

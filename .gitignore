@@ -6,7 +6,6 @@ downloads/
 data/search_history.json
 config.json
 .env
-*.db
 .DS_Store
 Thumbs.db
 
