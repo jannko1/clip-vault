@@ -7,10 +7,22 @@ Usage:
   results = search_wikimedia_local("mountain sunset", per_page=20)
 """
 import sqlite3
+import os
 import time
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "data" / "wikimedia_index.db"
+
+# Vercel serverless: filesystem is read-only. Open SQLite in read-only mode.
+# Use URI mode with mode=ro to prevent WAL/journal file creation.
+_IS_VERCEL = bool(os.environ.get("VERCEL"))
+
+def _get_conn():
+    """Get SQLite connection — read-only on Vercel, read-write locally."""
+    if _IS_VERCEL:
+        db_uri = f"file:{DB_PATH}?mode=ro"
+        return sqlite3.connect(db_uri, uri=True)
+    return sqlite3.connect(str(DB_PATH))
 
 # ── Helpers ─────────────────────────────────────────────
 
@@ -72,7 +84,7 @@ def search_wikimedia_local(query: str, per_page: int = 20) -> list:
     if not keywords:
         return []
 
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = _get_conn()
     conn.row_factory = sqlite3.Row
 
     results = []
@@ -156,7 +168,7 @@ def index_stats() -> dict:
         return {"exists": False, "total": 0, "last_updated": None}
 
     try:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = _get_conn()
         total = conn.execute("SELECT COUNT(*) FROM clips").fetchone()[0]
         last_update = conn.execute(
             "SELECT value FROM index_meta WHERE key='last_full_index'"
@@ -177,7 +189,7 @@ def get_download_url(page_id: int) -> str:
     if not DB_PATH.exists():
         return ""
 
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = _get_conn()
     row = conn.execute(
         "SELECT thumb_url, page_url FROM clips WHERE page_id = ?", (page_id,)
     ).fetchone()
