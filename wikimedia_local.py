@@ -174,8 +174,20 @@ def index_has_results(query: str, min_results: int = 3) -> bool:
 def index_stats() -> dict:
     """Return index statistics for status endpoint."""
     db_path = _resolve_db_path()
+    vercel_db = Path(__file__).parent / "data" / "wikimedia_index.db"
+    
+    # Debug: report which paths we checked
+    debug_info = {
+        "db_path_exists": db_path.exists(),
+        "db_path": str(db_path),
+        "vercel_path": str(vercel_db),
+        "vercel_path_exists": vercel_db.exists(),
+        "is_vercel": _IS_VERCEL,
+        "cwd": str(Path.cwd()),
+    }
+    
     if not db_path.exists():
-        return {"exists": False, "total": 0, "last_updated": None}
+        return {"exists": False, "total": 0, "last_updated": None, "_debug": debug_info}
 
     try:
         conn = _get_conn()
