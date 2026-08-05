@@ -12,17 +12,25 @@ import time
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "data" / "wikimedia_index.db"
+# On Vercel, the api/ dir is the source, so the DB is at api/data/
+_DB_PATH_VERCEL = Path(__file__).parent / "api" / "data" / "wikimedia_index.db"
 
 # Vercel serverless: filesystem is read-only. Open SQLite in read-only mode.
-# Use URI mode with mode=ro to prevent WAL/journal file creation.
 _IS_VERCEL = bool(os.environ.get("VERCEL"))
+
+def _resolve_db_path():
+    """Find the DB — try Vercel path first, then local path."""
+    if _DB_PATH_VERCEL.exists():
+        return _DB_PATH_VERCEL
+    return DB_PATH
 
 def _get_conn():
     """Get SQLite connection — read-only on Vercel, read-write locally."""
+    db_path = _resolve_db_path()
     if _IS_VERCEL:
-        db_uri = f"file:{DB_PATH}?mode=ro"
+        db_uri = f"file:{db_path}?mode=ro"
         return sqlite3.connect(db_uri, uri=True)
-    return sqlite3.connect(str(DB_PATH))
+    return sqlite3.connect(str(db_path))
 
 # ── Helpers ─────────────────────────────────────────────
 
@@ -77,7 +85,8 @@ def search_wikimedia_local(query: str, per_page: int = 20) -> list:
     Returns results in ClipVault-compatible format.
     Falls back to empty list if DB doesn't exist or has no results.
     """
-    if not DB_PATH.exists():
+    db_path = _resolve_db_path()
+    if not db_path.exists():
         return []
 
     keywords = _extract_visual_keywords(query)
@@ -164,7 +173,8 @@ def index_has_results(query: str, min_results: int = 3) -> bool:
 
 def index_stats() -> dict:
     """Return index statistics for status endpoint."""
-    if not DB_PATH.exists():
+    db_path = _resolve_db_path()
+    if not db_path.exists():
         return {"exists": False, "total": 0, "last_updated": None}
 
     try:
@@ -186,7 +196,8 @@ def index_stats() -> dict:
 
 def get_download_url(page_id: int) -> str:
     """Fetch actual download URL from DB. If missing, caller should use API."""
-    if not DB_PATH.exists():
+    db_path = _resolve_db_path()
+    if not db_path.exists():
         return ""
 
     conn = _get_conn()
