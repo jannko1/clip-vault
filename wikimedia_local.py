@@ -153,20 +153,23 @@ def index_has_results(query: str, min_results: int = 3) -> bool:
 def index_stats() -> dict:
     """Return index statistics for status endpoint."""
     if not DB_PATH.exists():
-        return {"exists": False, "total": 0}
+        return {"exists": False, "total": 0, "last_updated": None}
 
-    conn = sqlite3.connect(str(DB_PATH))
-    total = conn.execute("SELECT COUNT(*) FROM clips").fetchone()[0]
-    last_update = conn.execute(
-        "SELECT value FROM index_meta WHERE key='last_full_index'"
-    ).fetchone()
-    conn.close()
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        total = conn.execute("SELECT COUNT(*) FROM clips").fetchone()[0]
+        last_update = conn.execute(
+            "SELECT value FROM index_meta WHERE key='last_full_index'"
+        ).fetchone()
+        conn.close()
 
-    return {
-        "exists": True,
-        "total": total,
-        "last_updated": last_update[0] if last_update else None,
-    }
+        return {
+            "exists": True,
+            "total": total,
+            "last_updated": last_update[0] if last_update else None,
+        }
+    except sqlite3.OperationalError:
+        return {"exists": False, "total": 0, "last_updated": None, "error": "read-only filesystem"}
 
 
 def get_download_url(page_id: int) -> str:
