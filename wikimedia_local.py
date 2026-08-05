@@ -177,20 +177,9 @@ def index_has_results(query: str, min_results: int = 3) -> bool:
 def index_stats() -> dict:
     """Return index statistics for status endpoint."""
     db_path = _resolve_db_path()
-    vercel_db = Path(__file__).parent / "data" / "wikimedia_index.db"
-    
-    # Debug: report which paths we checked
-    debug_info = {
-        "db_path_exists": db_path.exists(),
-        "db_path": str(db_path),
-        "vercel_path": str(vercel_db),
-        "vercel_path_exists": vercel_db.exists(),
-        "is_vercel": _IS_VERCEL,
-        "cwd": str(Path.cwd()),
-    }
     
     if not db_path.exists():
-        return {"exists": False, "total": 0, "last_updated": None, "_debug": debug_info}
+        return {"exists": False, "total": 0, "last_updated": None}
 
     try:
         conn = _get_conn()
@@ -205,8 +194,8 @@ def index_stats() -> dict:
             "total": total,
             "last_updated": last_update[0] if last_update else None,
         }
-    except sqlite3.OperationalError:
-        return {"exists": False, "total": 0, "last_updated": None, "error": "read-only filesystem"}
+    except sqlite3.OperationalError as e:
+        return {"exists": False, "total": 0, "last_updated": None, "error": str(e)}
 
 
 def get_download_url(page_id: int) -> str:
