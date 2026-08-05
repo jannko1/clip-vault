@@ -28,8 +28,11 @@ def _get_conn():
     """Get SQLite connection — read-only on Vercel, read-write locally."""
     db_path = _resolve_db_path()
     if _IS_VERCEL:
-        db_uri = f"file:{db_path}?mode=ro"
-        return sqlite3.connect(db_uri, uri=True)
+        # Vercel: open read-only, no journal, no locking
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True)
+        conn.execute("PRAGMA query_only = ON")
+        conn.execute("PRAGMA journal_mode = OFF")
+        return conn
     return sqlite3.connect(str(db_path))
 
 # ── Helpers ─────────────────────────────────────────────
