@@ -19,7 +19,9 @@ _DB_PATH_VERCEL = Path(__file__).parent / "api" / "data" / "wikimedia_index.db"
 _IS_VERCEL = bool(os.environ.get("VERCEL"))
 
 def _resolve_db_path():
-    """Find the DB — try Vercel path first, then local path."""
+    """Find the DB — prefer the main data/ path, fall back to api/data (Vercel)."""
+    if DB_PATH.exists():
+        return DB_PATH
     if _DB_PATH_VERCEL.exists():
         return _DB_PATH_VERCEL
     return DB_PATH
@@ -61,13 +63,18 @@ def _extract_visual_keywords(query: str) -> list:
 
 def _format_result(row) -> dict:
     """Convert DB row to ClipVault-format result dict."""
+    # Build real thumbnail from filename: Special:FilePath returns a JPEG poster frame
+    raw_title = row[1]  # e.g. "File:Dying Light on Okanagan Mountain.webm"
+    filename = raw_title.replace("File:", "").replace(" ", "_")
+    thumb = f"https://commons.wikimedia.org/wiki/Special:FilePath/{filename}?width=640"
+
     return {
         "id": f"wikimedia-local-{row[0]}",
         "source": "Wikimedia",
         "source_url": row[11] or "",  # page_url
-        "thumbnail": row[5] or "",    # thumb_url
-        "preview": row[5] or "",      # thumb_url as preview (videos need API for mp4)
-        "download_url": "",           # Filled on-demand via API
+        "thumbnail": thumb,           # real poster frame (640px)
+        "preview": row[14] or "",     # 720p transcoded video (hover-play)
+        "download_url": row[14] or "",  # preview doubles as best download
         "duration": row[8] or 0,
         "width": row[6] or 0,
         "height": row[7] or 0,
@@ -120,7 +127,10 @@ def search_wikimedia_local(query: str, per_page: int = 20) -> list:
 
     try:
         rows = conn.execute("""
-            SELECT c.*, rank
+            SELECT c.page_id, c.title, c.description, c.categories, c.license,
+                   c.thumb_url, c.width, c.height, c.duration, c.size_bytes,
+                   c.mime, c.page_url, c.timestamp, c.indexed_at, c.preview_url,
+                   rank
             FROM clips_fts
             JOIN clips c ON clips_fts.rowid = c.page_id
             WHERE clips_fts MATCH ?
@@ -206,10 +216,10 @@ def get_download_url(page_id: int) -> str:
 
     conn = _get_conn()
     row = conn.execute(
-        "SELECT thumb_url, page_url FROM clips WHERE page_id = ?", (page_id,)
+        "SELECT preview_url, thumb_url FROM clips WHERE page_id = ?", (page_id,)
     ).fetchone()
     conn.close()
 
     if row:
-        return row[0]  # thumb_url is the best proxy; real video URL needs API
+        return row[0] or row[1]  # prefer transcoded video, fall back to file URL
     return ""
