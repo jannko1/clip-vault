@@ -64,14 +64,14 @@ def pick_best_preview(derivs, filename=""):
         best = min(real_derivs, key=score)
         return best.get("src", "")
 
-    # No transcodes listed — construct a deterministic 480p transcode URL
-    # (Wikimedia generates these on demand; frontend hides video if 404)
+    # No transcodes listed — construct the original file URL (always exists).
+    # Browsers play WebM natively; it's bigger than a transcode but loads fine.
     if filename:
         fn = filename.replace("File:", "").replace(" ", "_")
         import hashlib
         h = hashlib.md5(fn.encode()).hexdigest()
-        return (f"https://upload.wikimedia.org/wikipedia/commons/transcoded/"
-                f"{h[0]}/{h[:2]}/{fn}/{fn}.480p.vp9.webm")
+        return (f"https://upload.wikimedia.org/wikipedia/commons/"
+                f"{h[0]}/{h[:2]}/{fn}")
     return ""
 
 def main():
